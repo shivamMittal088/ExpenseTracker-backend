@@ -8,13 +8,14 @@ type UserPreferences = {
 
 export interface IUser extends Document {
   name: string;
-  email: string;
-  passwordHash: string;
+  emailId: string;
+  password: string;
   photoURL?: string;
   statusMessage?: string;
   currency: "INR" | "USD" | "EUR";
   preferences: UserPreferences;
-
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 const UserSchema = new Schema<IUser>(
@@ -26,7 +27,7 @@ const UserSchema = new Schema<IUser>(
       minlength:3,
     },
 
-    email: {
+    emailId: {
       type: String,
       required: true,
       unique: true,
@@ -34,7 +35,7 @@ const UserSchema = new Schema<IUser>(
       trim: true,
     },
 
-    passwordHash: {
+    password: {
       type: String,
       required: true,
     },
