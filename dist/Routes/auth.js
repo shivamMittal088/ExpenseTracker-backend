@@ -55,8 +55,13 @@ authRouter.post("/login", async (req, res) => {
             secure: false,
             expires: new Date(Date.now() + 8 * 3600000),
         });
-        await user.save();
         const { password: _password, ...safeUser } = user.toObject();
+        // This is object destructuring with renaming and rest operator.
+        // Take password out of the object, store it in a variable called _password,
+        // and put everything else into safeUser.
+        // user is a Mongoose document, not a plain JS object.
+        // It contains extra MongoDB stuff (_id, methods, metadata, etc.).
+        console.log("Logged in successfully ");
         res.json(safeUser);
     }
     catch (err) {

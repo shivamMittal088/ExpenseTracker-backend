@@ -1,11 +1,14 @@
 import express from "express";
+import { connectDB } from "../config/database";
 import http from "http";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 
+
+
 import authRouter from "../Routes/auth";
-import { connectDB } from "../config/database";
+import profileRouter from "../Routes/profile";
 
 dotenv.config();
 
@@ -17,11 +20,19 @@ app.use(cors({
   origin: "http://localhost:5173",
   credentials: true,
 }));
+
+
 app.use(express.json());
 app.use(cookieParser());
 
 // Routes
-app.use("/api/auth", authRouter);
+app.use("/api/auth/", authRouter);
+app.use("/api/",profileRouter);
+
+app.get("/test", (req, res) => {
+  res.send("Server alive");
+});
+
 
 const server = http.createServer(app);
 
