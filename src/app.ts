@@ -9,6 +9,9 @@ import dotenv from "dotenv";
 
 import authRouter from "../Routes/auth";
 import profileRouter from "../Routes/profile";
+import expenseRouter from "../Routes/expense";
+import seedRouter from "../Routes/seed";
+import tileRouter from "../Routes/tile";
 
 dotenv.config();
 
@@ -28,6 +31,9 @@ app.use(cookieParser());
 // Routes
 app.use("/api/auth/", authRouter);
 app.use("/api/",profileRouter);
+app.use("/api/",expenseRouter);
+app.use("/api/",seedRouter);
+app.use("/api/",tileRouter);
 
 app.get("/test", (req, res) => {
   res.send("Server alive");

@@ -7,21 +7,35 @@ const express_1 = __importDefault(require("express"));
 const UserSchema_1 = __importDefault(require("../Models/UserSchema"));
 const userAuth_1 = __importDefault(require("../Middlewares/userAuth"));
 const profileRouter = express_1.default.Router();
+/**
+ * GET /profile
+ * - Requires userAuth middleware to populate req.user
+ * - Returns the logged-in user's profile (password excluded)
+ *
+ * If you prefer to keep your original path, change to "/profile/view".
+ */
 profileRouter.get("/profile/view", userAuth_1.default, async (req, res, next) => {
     try {
         if (!req.user) {
             return res.status(401).json({ message: "Not authenticated" });
         }
-        const loggedInUser = req.user;
-        const loggedInUserId = loggedInUser._id;
-        const profile = await UserSchema_1.default.findById(loggedInUserId).select("-password");
+        const loggedInUserId = req.user._id;
+        // Query fresh data from DB and exclude password
+        const profile = await UserSchema_1.default.findById(loggedInUserId).select("-password").lean();
         if (!profile) {
             return res.status(404).json({ message: "User not found" });
         }
-        res.send(profile);
+        return res.status(200).json(profile);
     }
     catch (err) {
-        res.status(400).send({ error: err.message });
+        // Prefer passing to central error handler
+        // return next(err);
+        // Or, if you don't use an error handler, use:
+        // console.error(err);
+        return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
 });
 exports.default = profileRouter;
+// What .lean() does (Mongoose)
+// .lean() tells Mongoose to return plain JavaScript objects instead of Mongoose Document instances.
+// Plain objects are faster and use less memory because Mongoose skips building full document objects with getters/setters, change tracking, and instance methods.

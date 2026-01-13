@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from "mongoose";
+import Tiles from "./TilesSchema";
 
 type UserPreferences = {
   darkMode: boolean;
@@ -61,10 +62,12 @@ const UserSchema = new Schema<IUser>(
     type: Boolean,
     default: true,
     },
+
     startWeekOnMonday: {
     type: Boolean,
     default: true,
   },
+
 },
 
 
