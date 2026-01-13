@@ -31,4 +31,51 @@ expressRouter.post("/expense/add", userAuth_1.default, async (req, res, next) =>
         next(err);
     }
 });
+expressRouter.get("/expense/:date", userAuth_1.default, async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const rawDate = req.params.date;
+        // Validate date param
+        if (!rawDate || typeof rawDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
+            return res.status(400).json({
+                message: "Invalid date format. Use YYYY-MM-DD"
+            });
+        }
+        /*
+          Convert the user's local day into a UTC time range.
+    
+          Example (India):
+          User asks for 2026-01-13
+    
+          Local day:
+            2026-01-13 00:00 → 2026-01-13 23:59
+    
+          UTC equivalent:
+            2026-01-12 18:30 → 2026-01-13 18:30
+        */
+        // Local midnight
+        const localStart = new Date(rawDate + "T00:00:00");
+        // Convert local → UTC
+        const utcStart = new Date(localStart.getTime() - localStart.getTimezoneOffset() * 60000);
+        // End = next local midnight (UTC)
+        const utcEnd = new Date(utcStart);
+        utcEnd.setDate(utcEnd.getDate() + 1);
+        // Query MongoDB using UTC timestamps
+        const expenseTransactions = await ExpenseSchema_1.default.find({
+            userId,
+            occurredAt: {
+                $gte: utcStart,
+                $lt: utcEnd
+            }
+        }).sort({ occurredAt: -1 });
+        res.json({
+            message: "Expense list successfully fetched",
+            data: expenseTransactions
+        });
+    }
+    catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Failed to load expenses" });
+    }
+});
 exports.default = expressRouter;

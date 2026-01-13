@@ -7,6 +7,7 @@ const express_1 = __importDefault(require("express"));
 const UserSchema_1 = __importDefault(require("../Models/UserSchema"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const bcrypt_1 = __importDefault(require("bcrypt"));
+const userAuth_1 = __importDefault(require("../Middlewares/userAuth"));
 const authRouter = express_1.default.Router();
 /* ---------- Signup ---------- */
 authRouter.post("/signup", async (req, res) => {
@@ -66,6 +67,20 @@ authRouter.post("/login", async (req, res) => {
     }
     catch (err) {
         res.status(400).json({ err: err.message });
+    }
+});
+authRouter.post("/logout", userAuth_1.default, async (req, res) => {
+    try {
+    }
+    catch (err) {
+        console.log(err);
+    }
+});
+authRouter.patch("/update/password", userAuth_1.default, async (req, res) => {
+    try {
+    }
+    catch (err) {
+        console.log(err);
     }
 });
 exports.default = authRouter;

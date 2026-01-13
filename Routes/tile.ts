@@ -56,4 +56,24 @@ tileRouter.post("/tiles/add", userAuth, async(req:Request,res:Response)=>{
   }
 })
 
+
+tileRouter.delete("/tiles/remove/:id" ,userAuth , async(req:Request ,res:Response)=>{
+  try{
+    const authReq = req as AuthRequest;
+    const loggedInUserId = authReq.user._id;
+    const tileId = req.params.id;
+
+    const deletedTile = await Tiles.deleteOne({
+    userId : loggedInUserId,
+    _id : tileId,
+    isBuiltIn:false // prevent deleting default tiles .
+  })
+
+  res.status(201).send("tile deleted successfully");
+  }catch(err){
+    console.log(err);
+  }
+})
+
+
 export default tileRouter;

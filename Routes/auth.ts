@@ -2,6 +2,7 @@ import express, { Request, Response } from "express";
 import User from "../Models/UserSchema";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
+import userAuth from "../Middlewares/userAuth";
 
 const authRouter = express.Router();
 
@@ -86,5 +87,25 @@ authRouter.post("/login", async (req: Request, res: Response) => {
     res.status(400).json({ err: err.message });
   }
 });
+
+
+
+authRouter.post("/logout", userAuth ,async(req:Request ,res:Response)=>{
+  try{
+
+  }catch(err){
+    console.log(err);
+  }
+})
+
+
+
+authRouter.patch("/update/password", userAuth ,async(req:Request ,res:Response)=>{
+  try{
+
+  }catch(err){
+    console.log(err);
+  }
+})
 
 export default authRouter;
