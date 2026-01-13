@@ -29,6 +29,31 @@ tileRouter.get("/tiles", userAuth ,async (req:Request, res:Response) => {
   }
 });
 
-module.exports = tileRouter;
+
+
+tileRouter.post("/tiles/add", userAuth, async(req:Request,res:Response)=>{
+  try{
+    const {name , color ,userId ,emoji} = req.body;
+
+  const authReq = req as AuthRequest;
+  const loggedInUserId = authReq.user._id;
+
+  const addTile = await Tiles.create({
+    name,
+    color,
+    emoji,
+    "userId" : loggedInUserId
+  })
+
+  res.status(201).send({
+    message : "Added successfully",
+    data: addTile
+  })
+  }
+
+  catch(err){
+    console.log(err);
+  }
+})
 
 export default tileRouter;

@@ -25,5 +25,25 @@ tileRouter.get("/tiles", userAuth_1.default, async (req, res) => {
         res.status(500).json({ message: "Failed to load tiles" });
     }
 });
-module.exports = tileRouter;
+tileRouter.post("/tiles/add", userAuth_1.default, async (req, res) => {
+    try {
+        const { name, color, userId, emoji, isActive } = req.body;
+        const authReq = req;
+        const loggedInUserId = authReq.user._id;
+        const addTile = await TilesSchema_1.default.create({
+            name,
+            color,
+            userId,
+            emoji,
+            isActive
+        });
+        res.status(201).send({
+            message: "Added successfully",
+            data: addTile
+        });
+    }
+    catch (err) {
+        console.log(err);
+    }
+});
 exports.default = tileRouter;
