@@ -56,6 +56,10 @@ tileRouter.post("/tiles/add", userAuth, async(req:Request,res:Response)=>{
   }
 })
 
+tileRouter.patch("tiles/update", userAuth , async(req:Request ,res:Response)=>{
+
+})
+
 
 tileRouter.delete("/tiles/remove/:id" ,userAuth , async(req:Request ,res:Response)=>{
   try{

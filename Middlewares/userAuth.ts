@@ -62,41 +62,69 @@
 import { Request, Response, NextFunction } from "express";
 import jwt, { JwtPayload } from "jsonwebtoken";
 import User from "../Models/UserSchema";
+import SessionToken from "../Models/SessionTokenSchema";
 
-interface AuthRequest extends Request {
-  user?: any; // later you can replace with IUser
+/* ---- JWT Payload Type ---- */
+interface MyJwtPayload extends JwtPayload {
+  _id: string;
 }
 
-const userAuth = async (req: AuthRequest, res: Response, next: NextFunction
-) => {
+/* ---- Extend Express Request ---- */
+interface AuthRequest extends Request {
+  user?: any;
+}
+
+const JWT_SECRET = "MYSecretKey";
+
+const userAuth = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const token = req.cookies?.token;
 
+    // 1️⃣ No cookie
     if (!token) {
-      return res.status(401).json({ message: "No token found" });
+      return res.status(401).json({ code: "NO_TOKEN" });
     }
 
-    const decoded = jwt.verify(token, "MYSecretKey") as JwtPayload;
-
-    const userId = decoded._id;
-
-    const loggedInUser = await User.findById(userId);
-
-    if (!loggedInUser) {
-      return res.status(401).json({ message: "User not found" });
+    // 2️⃣ Verify JWT
+    let decoded: MyJwtPayload;
+    try {
+      decoded = jwt.verify(token, JWT_SECRET) as MyJwtPayload;
+    } catch (err: any) {
+      if (err.name === "TokenExpiredError") {
+        return res.status(401).json({ code: "SESSION_EXPIRED" });
+      }
+      return res.status(401).json({ code: "INVALID_TOKEN" });
     }
 
-    req.user = loggedInUser; // attach user to request
+    // 3️⃣ Check if this token still exists in DB (single-device login)
+    const session = await SessionToken.findOne({ token });
+
+    if (!session) {
+      return res.status(401).json({ code: "LOGGED_IN_ELSEWHERE" });
+    }
+
+    // 4️⃣ Extra DB expiry check (safety)
+    if (session.expiresAt < new Date()) {
+      await SessionToken.deleteOne({ token });
+      return res.status(401).json({ code: "SESSION_EXPIRED" });
+    }
+
+    // 5️⃣ Load user
+    const user = await User.findById(decoded._id);
+    if (!user) {
+      return res.status(401).json({ code: "INVALID_USER" });
+    }
+
+    // 6️⃣ Attach user to request
+    req.user = user;
     next();
-  } catch (err: any) {
-    return res.status(401).json({
-      message: "Token not verified",
-      error: err.message,
-    });
+  } catch (err) {
+    return res.status(401).json({ code: "AUTH_FAILED" });
   }
 };
 
 export default userAuth;
+
 
 
 // we hve created a middleware function named userAuth
@@ -105,5 +133,3 @@ export default userAuth;
 // otherwise it will send an error response indicating token verification failure
 
 // now it will act as a middleware in routes where authentication is required and to get userId of logged in user
-
-module.exports = userAuth;

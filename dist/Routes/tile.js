@@ -45,6 +45,8 @@ tileRouter.post("/tiles/add", userAuth_1.default, async (req, res) => {
         console.log(err);
     }
 });
+tileRouter.patch("tiles/update", userAuth_1.default, async (req, res) => {
+});
 tileRouter.delete("/tiles/remove/:id", userAuth_1.default, async (req, res) => {
     try {
         const authReq = req;

@@ -10,26 +10,47 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const UserSchema_1 = __importDefault(require("../Models/UserSchema"));
+const SessionTokenSchema_1 = __importDefault(require("../Models/SessionTokenSchema"));
+const JWT_SECRET = "MYSecretKey";
 const userAuth = async (req, res, next) => {
     try {
         const token = req.cookies?.token;
+        // 1️⃣ No cookie
         if (!token) {
-            return res.status(401).json({ message: "No token found" });
+            return res.status(401).json({ code: "NO_TOKEN" });
         }
-        const decoded = jsonwebtoken_1.default.verify(token, "MYSecretKey");
-        const userId = decoded._id;
-        const loggedInUser = await UserSchema_1.default.findById(userId);
-        if (!loggedInUser) {
-            return res.status(401).json({ message: "User not found" });
+        // 2️⃣ Verify JWT
+        let decoded;
+        try {
+            decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
         }
-        req.user = loggedInUser; // attach user to request
+        catch (err) {
+            if (err.name === "TokenExpiredError") {
+                return res.status(401).json({ code: "SESSION_EXPIRED" });
+            }
+            return res.status(401).json({ code: "INVALID_TOKEN" });
+        }
+        // 3️⃣ Check if this token still exists in DB (single-device login)
+        const session = await SessionTokenSchema_1.default.findOne({ token });
+        if (!session) {
+            return res.status(401).json({ code: "LOGGED_IN_ELSEWHERE" });
+        }
+        // 4️⃣ Extra DB expiry check (safety)
+        if (session.expiresAt < new Date()) {
+            await SessionTokenSchema_1.default.deleteOne({ token });
+            return res.status(401).json({ code: "SESSION_EXPIRED" });
+        }
+        // 5️⃣ Load user
+        const user = await UserSchema_1.default.findById(decoded._id);
+        if (!user) {
+            return res.status(401).json({ code: "INVALID_USER" });
+        }
+        // 6️⃣ Attach user to request
+        req.user = user;
         next();
     }
     catch (err) {
-        return res.status(401).json({
-            message: "Token not verified",
-            error: err.message,
-        });
+        return res.status(401).json({ code: "AUTH_FAILED" });
     }
 };
 exports.default = userAuth;
@@ -38,4 +59,3 @@ exports.default = userAuth;
 // if token is valid , it will allow the request to proceed to next middleware or route handler
 // otherwise it will send an error response indicating token verification failure
 // now it will act as a middleware in routes where authentication is required and to get userId of logged in user
-module.exports = userAuth;
