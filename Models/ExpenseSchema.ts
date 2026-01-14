@@ -14,6 +14,11 @@ const CategorySchema = new Schema({
     default: '#CCCCCC',
     match: [/^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})$/, 
         'Invalid HEX color']
+  },
+
+  emoji: {
+    type: String,
+    default: '✨'
   }
 }, { _id: false });
 
