@@ -1,8 +1,14 @@
-import express from "express";
-const expressRouter = express.Router();
+﻿import express, { NextFunction, Request, Response } from "express";
+import mongoose from "mongoose";
 import Expense from "../Models/ExpenseSchema";
 import userAuth from "../Middlewares/userAuth";
-import { NextFunction, Request, Response } from "express";
+
+const expressRouter = express.Router();
+
+const parseBool = (value: unknown): boolean =>
+  value === true || value === "true" || value === "1" || value === 1;
+
+
 
 expressRouter.post(
   "/expense/add",
@@ -10,6 +16,7 @@ expressRouter.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { amount, category, notes, payment_mode, currency, occurredAt } = req.body || {};
+      const userId = (req as any).user?._id;
 
       const normalizedPaymentMode =
         typeof payment_mode === "string"
@@ -18,14 +25,7 @@ expressRouter.post(
             : payment_mode.toLowerCase()
           : "";
 
-      const allowedPaymentModes = new Set([
-        "cash",
-        "card",
-        "bank_transfer",
-        "wallet",
-        "UPI",
-      ]);
-
+      const allowedPaymentModes = new Set(["cash", "card", "bank_transfer", "wallet", "UPI"]);
       const errors: string[] = [];
 
       if (typeof amount !== "number" || Number.isNaN(amount) || amount <= 0) {
@@ -36,11 +36,7 @@ expressRouter.post(
         errors.push("category.name is required");
       }
 
-      if (
-        category?.color &&
-        typeof category.color === "string" &&
-        !/^#([0-9A-Fa-f]{6})$/.test(category.color)
-      ) {
+      if (category?.color && typeof category.color === "string" && !/^#([0-9A-Fa-f]{6})$/.test(category.color)) {
         errors.push("category.color must be a 6-digit hex code (e.g. #ff9900)");
       }
 
@@ -56,14 +52,16 @@ expressRouter.post(
         errors.push("notes must be a string");
       }
 
-      // Validate optional occurredAt
-      let occurredAtDate: Date | null = null;
-      if (occurredAt) {
+      // Optional occurredAt: if missing/null/empty, default to server now; else parse and shift using client offset
+      let occurredAtDate: Date = new Date();
+      if (occurredAt !== undefined && occurredAt !== null && occurredAt !== "") {
         const parsed = new Date(occurredAt);
         if (Number.isNaN(parsed.getTime())) {
           errors.push("occurredAt must be a valid date string");
         } else {
-          occurredAtDate = parsed;
+          const clientOffset = Number(req.query.tzOffsetMinutes);
+          const offsetMinutes = Number.isFinite(clientOffset) ? clientOffset : parsed.getTimezoneOffset();
+          occurredAtDate = new Date(parsed.getTime() + offsetMinutes * 60000);
         }
       }
 
@@ -71,105 +69,38 @@ expressRouter.post(
         return res.status(400).json({ message: errors.join("; ") });
       }
 
-      const userId = (req as any).user._id; // from userAuth
-
-      // Use client-provided offset (same sign as getTimezoneOffset, e.g., India = -330) to align local time
-      const clientOffset = Number(req.query.tzOffsetMinutes);
-      const offsetMinutes = Number.isFinite(clientOffset)
-        ? clientOffset
-        : new Date().getTimezoneOffset();
-
-      // Determine occurredAt in UTC: if client sent occurredAt (local), convert using their offset; else use server now
-      const occurredAtUtc = occurredAtDate
-        ? new Date(occurredAtDate.getTime() + offsetMinutes * 60000)
-        : new Date();
-
-      const expense = await Expense.create({
+      const expenseDoc: any = {
         amount,
         category: {
           name: category.name.trim(),
           color: category.color || "#CCCCCC",
-          emoji: category.emoji || "✨",
+          emoji: category.emoji || "",
         },
         notes,
         payment_mode: normalizedPaymentMode,
-        currency: typeof currency === "string" ? currency.toUpperCase() : "INR",
-        occurredAt: occurredAtUtc,
+        occurredAt: occurredAtDate,
         userId,
-      });
+      };
 
-      res.status(201).json({
-        success: true,
+      if (currency) {
+        expenseDoc.currency = currency.toUpperCase();
+      }
+
+      const newExpense = await Expense.create(expenseDoc);
+
+      return res.status(201).json({
         message: "Expense added successfully",
-        data: expense,
+        data: newExpense,
       });
     } catch (err) {
-      next(err);
+      console.error(err);
+      return res.status(500).json({ message: "Failed to add expense" });
     }
   }
 );
 
-
+// Fetch expenses for a given local calendar date (YYYY-MM-DD), honoring optional tzOffsetMinutes
 expressRouter.get("/expense/:date", userAuth, async (req: Request, res: Response) => {
-  try {
-    const userId = (req as any).user._id;
-
-    const rawDate = req.params.date;
-
-    // Validate format YYYY-MM-DD
-    if (!rawDate || typeof rawDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
-      return res.status(400).json({
-        message: "Invalid date format. Use YYYY-MM-DD"
-      });
-    }
-
-    // Validate actual calendar date (avoid rollovers like 2026-02-31 → Mar 2)
-    const localStart = new Date(rawDate + "T00:00:00");
-    if (Number.isNaN(localStart.getTime())) {
-      return res.status(400).json({ message: "Invalid calendar date" });
-    }
-
-    /*
-      Convert the user's local day into a UTC time range using the client's offset when provided.
-
-      The client can send ?tzOffsetMinutes=<number> (same sign as getTimezoneOffset, e.g., India = -330)
-      to ensure the window matches their local day and avoids “today appears as yesterday”.
-    */
-
-    const clientOffset = Number(req.query.tzOffsetMinutes);
-    const offsetMinutes = Number.isFinite(clientOffset)
-      ? clientOffset
-      : localStart.getTimezoneOffset(); // fallback to server-local offset
-
-    // Convert local → UTC using chosen offset (offset has same sign as getTimezoneOffset)
-    const utcStart = new Date(localStart.getTime() + offsetMinutes * 60000);
-
-    // End = next local midnight (UTC)
-    const utcEnd = new Date(utcStart);
-    utcEnd.setDate(utcEnd.getDate() + 1);
-
-    // Query MongoDB using UTC timestamps
-    const expenseTransactions = await Expense.find({
-      userId,
-      occurredAt: {
-        $gte: utcStart,
-        $lt: utcEnd
-      }
-    }).sort({ occurredAt: -1 });
-
-    res.json({
-      message: "Expense list successfully fetched",
-      data: expenseTransactions
-    });
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Failed to load expenses" });
-  }
-});
-
-// Paginated (cursor-based) expense list for a given local date range
-expressRouter.get("/expense/:date/paged", userAuth, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user._id;
     const rawDate = req.params.date;
@@ -184,60 +115,187 @@ expressRouter.get("/expense/:date/paged", userAuth, async (req: Request, res: Re
     }
 
     const clientOffset = Number(req.query.tzOffsetMinutes);
-    const offsetMinutes = Number.isFinite(clientOffset)
-      ? clientOffset
-      : localStart.getTimezoneOffset();
+    const offsetMinutes = Number.isFinite(clientOffset) ? clientOffset : localStart.getTimezoneOffset();
 
     const utcStart = new Date(localStart.getTime() + offsetMinutes * 60000);
     const utcEnd = new Date(utcStart);
     utcEnd.setDate(utcEnd.getDate() + 1);
 
-    const limitRaw = Number(req.query.limit);
-    const limit = Number.isInteger(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 20;
+    const includeHidden = parseBool(req.query.includeHidden);
+    const onlyHidden = parseBool(req.query.onlyHidden);
 
-    const cursor = typeof req.query.cursor === "string" ? req.query.cursor : undefined;
-    let cursorDate: Date | null = null;
-    if (cursor) {
-      const parsed = new Date(cursor);
-      if (!Number.isNaN(parsed.getTime())) {
-        cursorDate = parsed;
-      }
-    }
-
-    const baseFilter: any = {
+    const expenseTransactions = await Expense.find({
       userId,
+      ...(onlyHidden ? { deleted: true } : includeHidden ? {} : { deleted: false }),
       occurredAt: {
         $gte: utcStart,
         $lt: utcEnd,
       },
-    };
+    }).sort({ occurredAt: -1 });
 
-    if (cursorDate) {
-      baseFilter.occurredAt.$lt = cursorDate;
-    }
-
-    const docs = await Expense.find(baseFilter)
-      .sort({ occurredAt: -1 })
-      .limit(limit + 1);
-
-    const hasNext = docs.length > limit;
-    const items = hasNext ? docs.slice(0, limit) : docs;
-    const nextCursor = hasNext ? items[items.length - 1].occurredAt?.toISOString?.() : null;
-
-    res.json({
-      message: "Expense page fetched",
-      data: items,
-      page: {
-        hasNext,
-        nextCursor,
-      },
+    return res.json({
+      message: "Expense list successfully fetched",
+      data: expenseTransactions,
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Failed to load expenses" });
+    return res.status(500).json({ message: "Failed to load expenses" });
   }
 });
 
+// Soft hide / restore an expense
+expressRouter.patch(
+  "/expense/:expenseId/hide",
+  userAuth,
+  async (req: Request, res: Response) => {
+    try {
+      const { expenseId } = req.params;
+      const userId = (req as any).user._id;
+      const { hide = true } = req.body ?? {};
 
+      if (!mongoose.isValidObjectId(expenseId)) {
+        return res.status(400).json({ message: "Invalid expense id" });
+      }
+
+      if (typeof hide !== "boolean") {
+        return res.status(400).json({ message: "hide must be a boolean" });
+      }
+
+      const updated = await Expense.findOneAndUpdate(
+        { _id: expenseId, userId },
+        { deleted: hide },
+        { new: true }
+      );
+
+      if (!updated) {
+        return res.status(404).json({ message: "Expense not found" });
+      }
+
+      return res.status(200).json({
+        message: hide ? "Expense hidden" : "Expense restored",
+        data: updated,
+      });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ message: "Failed to update expense" });
+    }
+  }
+);
+
+// Update an expense (amount, category, notes, payment_mode, currency, occurredAt)
+expressRouter.patch(
+  "/expense/:expenseId",
+  userAuth,
+  async (req: Request, res: Response) => {
+    try {
+      const { expenseId } = req.params;
+      const userId = (req as any).user._id;
+
+      if (!mongoose.isValidObjectId(expenseId)) {
+        return res.status(400).json({ message: "Invalid expense id" });
+      }
+
+      const { amount, category, notes, payment_mode, currency, occurredAt } = req.body || {};
+
+      const updateDoc: any = {};
+      const errors: string[] = [];
+
+      if (amount !== undefined) {
+        if (typeof amount !== "number" || Number.isNaN(amount) || amount <= 0) {
+          errors.push("amount must be a positive number");
+        } else {
+          updateDoc.amount = amount;
+        }
+      }
+
+      if (category !== undefined) {
+        if (!category || typeof category.name !== "string" || !category.name.trim()) {
+          errors.push("category.name is required");
+        }
+        if (category?.color && typeof category.color === "string" && !/^#([0-9A-Fa-f]{6})$/.test(category.color)) {
+          errors.push("category.color must be a 6-digit hex code (e.g. #ff9900)");
+        }
+
+        if (errors.length === 0) {
+          updateDoc.category = {
+            name: category.name.trim(),
+            color: category.color || "#CCCCCC",
+            emoji: category.emoji || "",
+          };
+        }
+      }
+
+      if (notes !== undefined) {
+        if (notes !== null && typeof notes !== "string") {
+          errors.push("notes must be a string");
+        } else {
+          updateDoc.notes = notes;
+        }
+      }
+
+      if (payment_mode !== undefined) {
+        const normalizedPaymentMode =
+          typeof payment_mode === "string"
+            ? payment_mode.toLowerCase() === "upi"
+              ? "UPI"
+              : payment_mode.toLowerCase()
+            : "";
+
+        const allowedPaymentModes = new Set(["cash", "card", "bank_transfer", "wallet", "UPI"]);
+
+        if (!allowedPaymentModes.has(normalizedPaymentMode)) {
+          errors.push("payment_mode must be one of cash, card, bank_transfer, wallet, UPI");
+        } else {
+          updateDoc.payment_mode = normalizedPaymentMode;
+        }
+      }
+
+      if (currency !== undefined) {
+        if (typeof currency !== "string" || currency.length !== 3) {
+          errors.push("currency must be a 3-letter code (e.g. INR)");
+        } else {
+          updateDoc.currency = currency.toUpperCase();
+        }
+      }
+
+      if (occurredAt !== undefined) {
+        const parsed = new Date(occurredAt);
+        if (Number.isNaN(parsed.getTime())) {
+          errors.push("occurredAt must be a valid date string");
+        } else {
+          const clientOffset = Number(req.query.tzOffsetMinutes);
+          const offsetMinutes = Number.isFinite(clientOffset) ? clientOffset : parsed.getTimezoneOffset();
+          updateDoc.occurredAt = new Date(parsed.getTime() + offsetMinutes * 60000);
+        }
+      }
+
+      if (errors.length) {
+        return res.status(400).json({ message: errors.join("; ") });
+      }
+
+      if (Object.keys(updateDoc).length === 0) {
+        return res.status(400).json({ message: "No updatable fields provided" });
+      }
+
+      const updated = await Expense.findOneAndUpdate(
+        { _id: expenseId, userId },
+        { $set: updateDoc },
+        { new: true }
+      );
+
+      if (!updated) {
+        return res.status(404).json({ message: "Expense not found" });
+      }
+
+      return res.status(200).json({
+        message: "Expense updated",
+        data: updated,
+      });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ message: "Failed to update expense" });
+    }
+  }
+);
 
 export default expressRouter;
