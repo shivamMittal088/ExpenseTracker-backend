@@ -168,6 +168,76 @@ expressRouter.get("/expense/:date", userAuth, async (req: Request, res: Response
   }
 });
 
+// Paginated (cursor-based) expense list for a given local date range
+expressRouter.get("/expense/:date/paged", userAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user._id;
+    const rawDate = req.params.date;
+
+    if (!rawDate || typeof rawDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
+      return res.status(400).json({ message: "Invalid date format. Use YYYY-MM-DD" });
+    }
+
+    const localStart = new Date(rawDate + "T00:00:00");
+    if (Number.isNaN(localStart.getTime())) {
+      return res.status(400).json({ message: "Invalid calendar date" });
+    }
+
+    const clientOffset = Number(req.query.tzOffsetMinutes);
+    const offsetMinutes = Number.isFinite(clientOffset)
+      ? clientOffset
+      : localStart.getTimezoneOffset();
+
+    const utcStart = new Date(localStart.getTime() + offsetMinutes * 60000);
+    const utcEnd = new Date(utcStart);
+    utcEnd.setDate(utcEnd.getDate() + 1);
+
+    const limitRaw = Number(req.query.limit);
+    const limit = Number.isInteger(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 20;
+
+    const cursor = typeof req.query.cursor === "string" ? req.query.cursor : undefined;
+    let cursorDate: Date | null = null;
+    if (cursor) {
+      const parsed = new Date(cursor);
+      if (!Number.isNaN(parsed.getTime())) {
+        cursorDate = parsed;
+      }
+    }
+
+    const baseFilter: any = {
+      userId,
+      occurredAt: {
+        $gte: utcStart,
+        $lt: utcEnd,
+      },
+    };
+
+    if (cursorDate) {
+      baseFilter.occurredAt.$lt = cursorDate;
+    }
+
+    const docs = await Expense.find(baseFilter)
+      .sort({ occurredAt: -1 })
+      .limit(limit + 1);
+
+    const hasNext = docs.length > limit;
+    const items = hasNext ? docs.slice(0, limit) : docs;
+    const nextCursor = hasNext ? items[items.length - 1].occurredAt?.toISOString?.() : null;
+
+    res.json({
+      message: "Expense page fetched",
+      data: items,
+      page: {
+        hasNext,
+        nextCursor,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to load expenses" });
+  }
+});
+
 
 
 export default expressRouter;
