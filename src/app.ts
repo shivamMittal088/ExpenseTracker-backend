@@ -17,10 +17,11 @@ dotenv.config();
 
 const app = express();
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
+const ALLOWED_ORIGINS = FRONTEND_ORIGIN.split(",").map((o) => o.trim()).filter(Boolean);
 
 // Middlewares
 app.use(cors({
-  origin: FRONTEND_ORIGIN,
+  origin: true,
   credentials: true,
 }));
 
