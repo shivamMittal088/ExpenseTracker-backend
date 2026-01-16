@@ -20,6 +20,12 @@ const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
 const ALLOWED_ORIGINS = FRONTEND_ORIGIN.split(",").map((o) => o.trim()).filter(Boolean);
 
 // Middlewares
+// Handle preflight OPTIONS for all routes
+app.options("*", cors({
+  origin: true,
+  credentials: true,
+}));
+
 app.use(cors({
   origin: true,
   credentials: true,
