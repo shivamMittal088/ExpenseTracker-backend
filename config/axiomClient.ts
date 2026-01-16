@@ -1,8 +1,10 @@
 import { Axiom } from "@axiomhq/js";
 import dotenv from "dotenv";
 
-// Load env variables before reading them for the Axiom client.
-dotenv.config();
+// Load env variables locally; avoid overriding Vercel environment at runtime.
+if (!process.env.VERCEL) {
+  dotenv.config();
+}
 
 const axiomToken = process.env.AXIOM_TOKEN;
 const axiomOrgId = process.env.AXIOM_ORG_ID;
