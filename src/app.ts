@@ -1,6 +1,4 @@
 import express from "express";
-import { connectDB } from "../config/database";
-import http from "http";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
@@ -18,7 +16,6 @@ import tileRouter from "../Routes/tile";
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
 
 // Middlewares
@@ -43,23 +40,4 @@ app.get("/test", (req, res) => {
   res.send("Server alive");
 });
 
-
-const server = http.createServer(app);
-
-connectDB()
-  .then(() => {
-    console.log("Database connected successfully");
-    void sendLog({
-      type: "app_start",
-      message: "Backend server started",
-      port: PORT,
-      dataset: process.env.AXIOM_DATASET,
-    });
-    server.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
-    });
-  })
-  .catch((err:any) => {
-    console.error("Database connection failed ❌", err);
-    process.exit(1);
-  });
+export default app;
