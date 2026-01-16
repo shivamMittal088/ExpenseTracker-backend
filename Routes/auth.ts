@@ -4,6 +4,7 @@ import SessionToken from "../Models/SessionTokenSchema";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import userAuth from "../Middlewares/userAuth";
+import { logApiError, logEvent } from "../utils/logger";
 
 const authRouter = express.Router();
 
@@ -53,8 +54,15 @@ authRouter.post("/signup", async (req:  Request, res: Response) => {
       expires: expiresAt,
     });
 
+    logEvent("info", "User signed up", {
+      route: "POST /signup",
+      userId: savedUser._id,
+      emailId,
+    });
+
     res.json({ message: "Signup successful" });
   } catch (err: any) {
+    logApiError(req, err, { route: "POST /signup" });
     res.status(400).json({ err: err.message });
   }
 });
@@ -105,15 +113,26 @@ authRouter.post("/login", async (req:  Request, res: Response) => {
 
     const { password: _password, ...safeUser } = user. toObject();
 
-    console.log("Logged in successfully");
+    logEvent("info", "User logged in", {
+      route: "POST /login",
+      userId: user._id,
+      emailId,
+    });
+
     res.json(safeUser);
   } catch (err: any) {
+    logApiError(req, err, { route: "POST /login" });
     res.status(400).json({ err: err.message });
   }
 });
 
 /* ---------- Get Current User ---------- */
 authRouter.get("/me", userAuth, (req: Request, res: Response) => {
+  logEvent("info", "Fetched current user", {
+    route: "GET /me",
+    userId: (req as any).user._id,
+  });
+
   res.json({
     _id:  (req as any).user._id,
     name: (req as any).user.name,
@@ -132,8 +151,14 @@ authRouter.post("/logout", userAuth, async (req: Request, res:  Response) => {
 
     res.clearCookie("token");
 
+    logEvent("info", "User logged out", {
+      route: "POST /logout",
+      userId,
+    });
+
     res.json({ message: "Logged out successfully" });
   } catch (err: any) {
+    logApiError(req, err, { route: "POST /logout" });
     res.status(400).json({ err: err.message });
   }
 });
@@ -165,8 +190,14 @@ authRouter.patch("/update/password", userAuth, async (req: Request, res: Respons
 
     res.clearCookie("token");
 
+    logEvent("info", "User password updated", {
+      route: "PATCH /update/password",
+      userId,
+    });
+
     res.json({ message: "Password updated.  Please login again." });
   } catch (err: any) {
+    logApiError(req, err, { route: "PATCH /update/password" });
     res.status(400).json({ err: err.message });
   }
 });

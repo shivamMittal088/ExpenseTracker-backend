@@ -9,6 +9,7 @@ const SessionTokenSchema_1 = __importDefault(require("../Models/SessionTokenSche
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const userAuth_1 = __importDefault(require("../Middlewares/userAuth"));
+const logger_1 = require("../utils/logger");
 const authRouter = express_1.default.Router();
 const TOKEN_EXPIRY_MS = 1 * 60 * 60 * 1000; // 1 hour
 /* ---------- Signup ---------- */
@@ -41,9 +42,15 @@ authRouter.post("/signup", async (req, res) => {
             secure: false,
             expires: expiresAt,
         });
+        (0, logger_1.logEvent)("info", "User signed up", {
+            route: "POST /signup",
+            userId: savedUser._id,
+            emailId,
+        });
         res.json({ message: "Signup successful" });
     }
     catch (err) {
+        (0, logger_1.logApiError)(req, err, { route: "POST /signup" });
         res.status(400).json({ err: err.message });
     }
 });
@@ -77,15 +84,24 @@ authRouter.post("/login", async (req, res) => {
             expires: expiresAt,
         });
         const { password: _password, ...safeUser } = user.toObject();
-        console.log("Logged in successfully");
+        (0, logger_1.logEvent)("info", "User logged in", {
+            route: "POST /login",
+            userId: user._id,
+            emailId,
+        });
         res.json(safeUser);
     }
     catch (err) {
+        (0, logger_1.logApiError)(req, err, { route: "POST /login" });
         res.status(400).json({ err: err.message });
     }
 });
 /* ---------- Get Current User ---------- */
 authRouter.get("/me", userAuth_1.default, (req, res) => {
+    (0, logger_1.logEvent)("info", "Fetched current user", {
+        route: "GET /me",
+        userId: req.user._id,
+    });
     res.json({
         _id: req.user._id,
         name: req.user.name,
@@ -98,9 +114,14 @@ authRouter.post("/logout", userAuth_1.default, async (req, res) => {
         const userId = req.user._id;
         await SessionTokenSchema_1.default.deleteOne({ userId: userId });
         res.clearCookie("token");
+        (0, logger_1.logEvent)("info", "User logged out", {
+            route: "POST /logout",
+            userId,
+        });
         res.json({ message: "Logged out successfully" });
     }
     catch (err) {
+        (0, logger_1.logApiError)(req, err, { route: "POST /logout" });
         res.status(400).json({ err: err.message });
     }
 });
@@ -122,9 +143,14 @@ authRouter.patch("/update/password", userAuth_1.default, async (req, res) => {
         await user.save();
         await SessionTokenSchema_1.default.deleteOne({ userId: userId });
         res.clearCookie("token");
+        (0, logger_1.logEvent)("info", "User password updated", {
+            route: "PATCH /update/password",
+            userId,
+        });
         res.json({ message: "Password updated.  Please login again." });
     }
     catch (err) {
+        (0, logger_1.logApiError)(req, err, { route: "PATCH /update/password" });
         res.status(400).json({ err: err.message });
     }
 });

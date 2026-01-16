@@ -4,6 +4,8 @@ import http from "http";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
+import { axiomRequestLogger } from "../Middlewares/axiomLogger";
+import { sendLog } from "../config/axiomClient";
 
 
 
@@ -28,6 +30,7 @@ app.use(cors({
 
 app.use(express.json());
 app.use(cookieParser());
+app.use(axiomRequestLogger);
 
 // Routes
 app.use("/api/auth/", authRouter);
@@ -46,6 +49,12 @@ const server = http.createServer(app);
 connectDB()
   .then(() => {
     console.log("Database connected successfully");
+    void sendLog({
+      type: "app_start",
+      message: "Backend server started",
+      port: PORT,
+      dataset: process.env.AXIOM_DATASET,
+    });
     server.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });

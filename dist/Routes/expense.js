@@ -7,6 +7,7 @@ const express_1 = __importDefault(require("express"));
 const mongoose_1 = __importDefault(require("mongoose"));
 const ExpenseSchema_1 = __importDefault(require("../Models/ExpenseSchema"));
 const userAuth_1 = __importDefault(require("../Middlewares/userAuth"));
+const logger_1 = require("../utils/logger");
 const expressRouter = express_1.default.Router();
 const parseBool = (value) => value === true || value === "true" || value === "1" || value === 1;
 expressRouter.post("/expense/add", userAuth_1.default, async (req, res, next) => {
@@ -38,8 +39,9 @@ expressRouter.post("/expense/add", userAuth_1.default, async (req, res, next) =>
         if (notes && typeof notes !== "string") {
             errors.push("notes must be a string");
         }
+        // Optional occurredAt: if missing/null/empty, default to server now; else parse and shift using client offset
         let occurredAtDate = new Date();
-        if (occurredAt !== undefined) {
+        if (occurredAt !== undefined && occurredAt !== null && occurredAt !== "") {
             const parsed = new Date(occurredAt);
             if (Number.isNaN(parsed.getTime())) {
                 errors.push("occurredAt must be a valid date string");
@@ -51,6 +53,11 @@ expressRouter.post("/expense/add", userAuth_1.default, async (req, res, next) =>
             }
         }
         if (errors.length) {
+            (0, logger_1.logEvent)("warn", "Expense validation failed", {
+                route: "POST /expense/add",
+                userId,
+                errors,
+            });
             return res.status(400).json({ message: errors.join("; ") });
         }
         const expenseDoc = {
@@ -69,13 +76,20 @@ expressRouter.post("/expense/add", userAuth_1.default, async (req, res, next) =>
             expenseDoc.currency = currency.toUpperCase();
         }
         const newExpense = await ExpenseSchema_1.default.create(expenseDoc);
+        (0, logger_1.logEvent)("info", "Expense created", {
+            route: "POST /expense/add",
+            userId,
+            expenseId: newExpense?._id,
+            amount: newExpense?.amount,
+            category: newExpense?.category?.name,
+        });
         return res.status(201).json({
             message: "Expense added successfully",
             data: newExpense,
         });
     }
     catch (err) {
-        console.error(err);
+        (0, logger_1.logApiError)(req, err, { route: "POST /expense/add" });
         return res.status(500).json({ message: "Failed to add expense" });
     }
 });
@@ -85,10 +99,20 @@ expressRouter.get("/expense/:date", userAuth_1.default, async (req, res) => {
         const userId = req.user._id;
         const rawDate = req.params.date;
         if (!rawDate || typeof rawDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
+            (0, logger_1.logEvent)("warn", "Invalid expense date format", {
+                route: "GET /expense/:date",
+                userId,
+                rawDate,
+            });
             return res.status(400).json({ message: "Invalid date format. Use YYYY-MM-DD" });
         }
         const localStart = new Date(rawDate + "T00:00:00");
         if (Number.isNaN(localStart.getTime())) {
+            (0, logger_1.logEvent)("warn", "Invalid expense calendar date", {
+                route: "GET /expense/:date",
+                userId,
+                rawDate,
+            });
             return res.status(400).json({ message: "Invalid calendar date" });
         }
         const clientOffset = Number(req.query.tzOffsetMinutes);
@@ -106,13 +130,19 @@ expressRouter.get("/expense/:date", userAuth_1.default, async (req, res) => {
                 $lt: utcEnd,
             },
         }).sort({ occurredAt: -1 });
+        (0, logger_1.logEvent)("info", "Expense list fetched", {
+            route: "GET /expense/:date",
+            userId,
+            count: expenseTransactions.length,
+            date: rawDate,
+        });
         return res.json({
             message: "Expense list successfully fetched",
             data: expenseTransactions,
         });
     }
     catch (err) {
-        console.error(err);
+        (0, logger_1.logApiError)(req, err, { route: "GET /expense/:date" });
         return res.status(500).json({ message: "Failed to load expenses" });
     }
 });
@@ -123,22 +153,44 @@ expressRouter.patch("/expense/:expenseId/hide", userAuth_1.default, async (req, 
         const userId = req.user._id;
         const { hide = true } = req.body ?? {};
         if (!mongoose_1.default.isValidObjectId(expenseId)) {
+            (0, logger_1.logEvent)("warn", "Invalid expense id", {
+                route: "PATCH /expense/:expenseId/hide",
+                userId,
+                expenseId,
+            });
             return res.status(400).json({ message: "Invalid expense id" });
         }
         if (typeof hide !== "boolean") {
+            (0, logger_1.logEvent)("warn", "Invalid hide flag", {
+                route: "PATCH /expense/:expenseId/hide",
+                userId,
+                expenseId,
+                hide,
+            });
             return res.status(400).json({ message: "hide must be a boolean" });
         }
         const updated = await ExpenseSchema_1.default.findOneAndUpdate({ _id: expenseId, userId }, { deleted: hide }, { new: true });
         if (!updated) {
+            (0, logger_1.logEvent)("warn", "Expense not found for hide/update", {
+                route: "PATCH /expense/:expenseId/hide",
+                userId,
+                expenseId,
+            });
             return res.status(404).json({ message: "Expense not found" });
         }
+        (0, logger_1.logEvent)("info", "Expense hide updated", {
+            route: "PATCH /expense/:expenseId/hide",
+            userId,
+            expenseId,
+            hidden: updated.deleted,
+        });
         return res.status(200).json({
             message: hide ? "Expense hidden" : "Expense restored",
             data: updated,
         });
     }
     catch (err) {
-        console.error(err);
+        (0, logger_1.logApiError)(req, err, { route: "PATCH /expense/:expenseId/hide" });
         return res.status(500).json({ message: "Failed to update expense" });
     }
 });
@@ -148,6 +200,11 @@ expressRouter.patch("/expense/:expenseId", userAuth_1.default, async (req, res) 
         const { expenseId } = req.params;
         const userId = req.user._id;
         if (!mongoose_1.default.isValidObjectId(expenseId)) {
+            (0, logger_1.logEvent)("warn", "Invalid expense id", {
+                route: "PATCH /expense/:expenseId",
+                userId,
+                expenseId,
+            });
             return res.status(400).json({ message: "Invalid expense id" });
         }
         const { amount, category, notes, payment_mode, currency, occurredAt } = req.body || {};
@@ -218,22 +275,43 @@ expressRouter.patch("/expense/:expenseId", userAuth_1.default, async (req, res) 
             }
         }
         if (errors.length) {
+            (0, logger_1.logEvent)("warn", "Expense update validation failed", {
+                route: "PATCH /expense/:expenseId",
+                userId,
+                expenseId,
+                errors,
+            });
             return res.status(400).json({ message: errors.join("; ") });
         }
         if (Object.keys(updateDoc).length === 0) {
+            (0, logger_1.logEvent)("warn", "No updatable fields provided", {
+                route: "PATCH /expense/:expenseId",
+                userId,
+                expenseId,
+            });
             return res.status(400).json({ message: "No updatable fields provided" });
         }
         const updated = await ExpenseSchema_1.default.findOneAndUpdate({ _id: expenseId, userId }, { $set: updateDoc }, { new: true });
         if (!updated) {
+            (0, logger_1.logEvent)("warn", "Expense not found", {
+                route: "PATCH /expense/:expenseId",
+                userId,
+                expenseId,
+            });
             return res.status(404).json({ message: "Expense not found" });
         }
+        (0, logger_1.logEvent)("info", "Expense updated", {
+            route: "PATCH /expense/:expenseId",
+            userId,
+            expenseId,
+        });
         return res.status(200).json({
             message: "Expense updated",
             data: updated,
         });
     }
     catch (err) {
-        console.error(err);
+        (0, logger_1.logApiError)(req, err, { route: "PATCH /expense/:expenseId" });
         return res.status(500).json({ message: "Failed to update expense" });
     }
 });

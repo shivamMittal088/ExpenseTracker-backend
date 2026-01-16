@@ -4,6 +4,7 @@ import Tiles from "../Models/TilesSchema";
 import { Request,Response} from "express";
 import userAuth from "../Middlewares/userAuth";
 import { IUser } from "../Models/UserSchema";
+import { logApiError, logEvent } from "../utils/logger";
 
 interface AuthRequest extends Request {
   user: IUser;
@@ -22,9 +23,15 @@ tileRouter.get("/tiles", userAuth ,async (req:Request, res:Response) => {
       ]
     }).sort({ isBuiltIn: -1, name: 1 }); // built-ins first, then user tiles
 
+    logEvent("info", "Tiles fetched", {
+      route: "GET /tiles",
+      userId,
+      count: tiles.length,
+    });
+
     res.json(tiles);
   } catch (err) {
-    console.error(err);
+    logApiError(req, err, { route: "GET /tiles" });
     res.status(500).json({ message: "Failed to load tiles" });
   }
 });
@@ -45,6 +52,13 @@ tileRouter.post("/tiles/add", userAuth, async(req:Request,res:Response)=>{
     "userId" : loggedInUserId
   })
 
+  logEvent("info", "Tile added", {
+    route: "POST /tiles/add",
+    userId: loggedInUserId,
+    tileId: addTile._id,
+    name: addTile.name,
+  });
+
   res.status(201).send({
     message : "Added successfully",
     data: addTile
@@ -52,7 +66,8 @@ tileRouter.post("/tiles/add", userAuth, async(req:Request,res:Response)=>{
   }
 
   catch(err){
-    console.log(err);
+    logApiError(req, err, { route: "POST /tiles/add" });
+    res.status(500).json({ message: "Failed to add tile" });
   }
 })
 
@@ -73,9 +88,17 @@ tileRouter.delete("/tiles/remove/:id" ,userAuth , async(req:Request ,res:Respons
     isBuiltIn:false // prevent deleting default tiles .
   })
 
+  logEvent("info", "Tile removed", {
+    route: "DELETE /tiles/remove/:id",
+    userId: loggedInUserId,
+    tileId,
+    deletedCount: deletedTile.deletedCount,
+  });
+
   res.status(201).send("tile deleted successfully");
   }catch(err){
-    console.log(err);
+    logApiError(req, err, { route: "DELETE /tiles/remove/:id" });
+    res.status(500).json({ message: "Failed to remove tile" });
   }
 })
 

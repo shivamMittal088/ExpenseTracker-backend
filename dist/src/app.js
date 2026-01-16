@@ -9,6 +9,8 @@ const http_1 = __importDefault(require("http"));
 const cors_1 = __importDefault(require("cors"));
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const dotenv_1 = __importDefault(require("dotenv"));
+const axiomLogger_1 = require("../Middlewares/axiomLogger");
+const axiomClient_1 = require("../config/axiomClient");
 const auth_1 = __importDefault(require("../Routes/auth"));
 const profile_1 = __importDefault(require("../Routes/profile"));
 const expense_1 = __importDefault(require("../Routes/expense"));
@@ -25,6 +27,7 @@ app.use((0, cors_1.default)({
 }));
 app.use(express_1.default.json());
 app.use((0, cookie_parser_1.default)());
+app.use(axiomLogger_1.axiomRequestLogger);
 // Routes
 app.use("/api/auth/", auth_1.default);
 app.use("/api/", profile_1.default);
@@ -38,6 +41,12 @@ const server = http_1.default.createServer(app);
 (0, database_1.connectDB)()
     .then(() => {
     console.log("Database connected successfully");
+    void (0, axiomClient_1.sendLog)({
+        type: "app_start",
+        message: "Backend server started",
+        port: PORT,
+        dataset: process.env.AXIOM_DATASET,
+    });
     server.listen(PORT, () => {
         console.log(`Server running on port ${PORT}`);
     });

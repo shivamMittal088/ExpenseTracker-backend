@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction } from "express";
 import User from "../Models/UserSchema";
 import userAuth from "../Middlewares/userAuth";
 import { IUser } from "../Models/UserSchema";
+import { logApiError, logEvent } from "../utils/logger";
 
 declare global {
   namespace Express {
@@ -38,12 +39,14 @@ profileRouter.get(
         return res.status(404).json({ message: "User not found" });
       }
 
+      logEvent("info", "Profile fetched", {
+        route: "GET /profile/view",
+        userId: loggedInUserId,
+      });
+
       return res.status(200).json(profile);
     } catch (err: any) {
-      // Prefer passing to central error handler
-      // return next(err);
-      // Or, if you don't use an error handler, use:
-      // console.error(err);
+      logApiError(req, err, { route: "GET /profile/view" });
       return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
   }

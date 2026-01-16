@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const UserSchema_1 = __importDefault(require("../Models/UserSchema"));
 const userAuth_1 = __importDefault(require("../Middlewares/userAuth"));
+const logger_1 = require("../utils/logger");
 const profileRouter = express_1.default.Router();
 /**
  * GET /profile
@@ -25,13 +26,14 @@ profileRouter.get("/profile/view", userAuth_1.default, async (req, res, next) =>
         if (!profile) {
             return res.status(404).json({ message: "User not found" });
         }
+        (0, logger_1.logEvent)("info", "Profile fetched", {
+            route: "GET /profile/view",
+            userId: loggedInUserId,
+        });
         return res.status(200).json(profile);
     }
     catch (err) {
-        // Prefer passing to central error handler
-        // return next(err);
-        // Or, if you don't use an error handler, use:
-        // console.error(err);
+        (0, logger_1.logApiError)(req, err, { route: "GET /profile/view" });
         return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
 });
