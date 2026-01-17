@@ -1,14 +1,76 @@
 import express, { Request, Response } from "express";
 import User from "../Models/UserSchema";
 import SessionToken from "../Models/SessionTokenSchema";
+import LoginHistory from "../Models/LoginHistorySchema";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import userAuth from "../Middlewares/userAuth";
 import { logApiError, logEvent } from "../utils/logger";
+import { UAParser } from "ua-parser-js";
 
 const authRouter = express.Router();
 
 const TOKEN_EXPIRY_MS = 1 * 60 * 60 * 1000; // 1 hour
+
+// Helper to parse user agent and get client IP
+const getClientInfo = (req: Request) => {
+  const parser = new UAParser(req.headers["user-agent"] || "");
+  const result = parser.getResult();
+
+  // Get IP address (handle proxies)
+  const forwarded = req.headers["x-forwarded-for"];
+  const ip = forwarded
+    ? (Array.isArray(forwarded) ? forwarded[0] : forwarded.split(",")[0])
+    : req.ip || req.socket.remoteAddress || "Unknown";
+
+  // Determine device type
+  let device = "Desktop";
+  if (result.device.type === "mobile") device = "Mobile";
+  else if (result.device.type === "tablet") device = "Tablet";
+  else if (!result.device.type && result.os.name) device = "Desktop";
+  else device = "Unknown";
+
+  return {
+    ipAddress: ip,
+    userAgent: req.headers["user-agent"] || "Unknown",
+    browser: result.browser.name
+      ? `${result.browser.name} ${result.browser.version || ""}`.trim()
+      : "Unknown",
+    os: result.os.name
+      ? `${result.os.name} ${result.os.version || ""}`.trim()
+      : "Unknown",
+    device,
+  };
+};
+
+// Helper to record login history
+const recordLogin = async (
+  userId: string,
+  req: Request,
+  isSuccessful: boolean
+) => {
+  try {
+    const clientInfo = getClientInfo(req);
+    await LoginHistory.create({
+      userId,
+      ...clientInfo,
+      isSuccessful,
+      loginAt: new Date(),
+    });
+
+    // Keep only last 20 records per user
+    const count = await LoginHistory.countDocuments({ userId });
+    if (count > 20) {
+      const oldRecords = await LoginHistory.find({ userId })
+        .sort({ loginAt: 1 })
+        .limit(count - 20);
+      const idsToDelete = oldRecords.map((r) => r._id);
+      await LoginHistory.deleteMany({ _id: { $in: idsToDelete } });
+    }
+  } catch (err) {
+    logApiError(req, err as Error, { context: "recordLogin" });
+  }
+};
 
 /* ---------- Signup ---------- */
 authRouter.post("/signup", async (req:  Request, res: Response) => {
@@ -110,6 +172,9 @@ authRouter.post("/login", async (req:  Request, res: Response) => {
       secure: process.env.NODE_ENV === "production",
       expires: expiresAt,
     });
+
+    // Record successful login
+    await recordLogin(user._id.toString(), req, true);
 
     const { password: _password, ...safeUser } = user. toObject();
 

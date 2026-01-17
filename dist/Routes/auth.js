@@ -6,12 +6,69 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const UserSchema_1 = __importDefault(require("../Models/UserSchema"));
 const SessionTokenSchema_1 = __importDefault(require("../Models/SessionTokenSchema"));
+const LoginHistorySchema_1 = __importDefault(require("../Models/LoginHistorySchema"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const userAuth_1 = __importDefault(require("../Middlewares/userAuth"));
 const logger_1 = require("../utils/logger");
+const ua_parser_js_1 = require("ua-parser-js");
 const authRouter = express_1.default.Router();
 const TOKEN_EXPIRY_MS = 1 * 60 * 60 * 1000; // 1 hour
+// Helper to parse user agent and get client IP
+const getClientInfo = (req) => {
+    const parser = new ua_parser_js_1.UAParser(req.headers["user-agent"] || "");
+    const result = parser.getResult();
+    // Get IP address (handle proxies)
+    const forwarded = req.headers["x-forwarded-for"];
+    const ip = forwarded
+        ? (Array.isArray(forwarded) ? forwarded[0] : forwarded.split(",")[0])
+        : req.ip || req.socket.remoteAddress || "Unknown";
+    // Determine device type
+    let device = "Desktop";
+    if (result.device.type === "mobile")
+        device = "Mobile";
+    else if (result.device.type === "tablet")
+        device = "Tablet";
+    else if (!result.device.type && result.os.name)
+        device = "Desktop";
+    else
+        device = "Unknown";
+    return {
+        ipAddress: ip,
+        userAgent: req.headers["user-agent"] || "Unknown",
+        browser: result.browser.name
+            ? `${result.browser.name} ${result.browser.version || ""}`.trim()
+            : "Unknown",
+        os: result.os.name
+            ? `${result.os.name} ${result.os.version || ""}`.trim()
+            : "Unknown",
+        device,
+    };
+};
+// Helper to record login history
+const recordLogin = async (userId, req, isSuccessful) => {
+    try {
+        const clientInfo = getClientInfo(req);
+        await LoginHistorySchema_1.default.create({
+            userId,
+            ...clientInfo,
+            isSuccessful,
+            loginAt: new Date(),
+        });
+        // Keep only last 20 records per user
+        const count = await LoginHistorySchema_1.default.countDocuments({ userId });
+        if (count > 20) {
+            const oldRecords = await LoginHistorySchema_1.default.find({ userId })
+                .sort({ loginAt: 1 })
+                .limit(count - 20);
+            const idsToDelete = oldRecords.map((r) => r._id);
+            await LoginHistorySchema_1.default.deleteMany({ _id: { $in: idsToDelete } });
+        }
+    }
+    catch (err) {
+        (0, logger_1.logApiError)(req, err, { context: "recordLogin" });
+    }
+};
 /* ---------- Signup ---------- */
 authRouter.post("/signup", async (req, res) => {
     try {
@@ -83,6 +140,8 @@ authRouter.post("/login", async (req, res) => {
             secure: process.env.NODE_ENV === "production",
             expires: expiresAt,
         });
+        // Record successful login
+        await recordLogin(user._id.toString(), req, true);
         const { password: _password, ...safeUser } = user.toObject();
         (0, logger_1.logEvent)("info", "User logged in", {
             route: "POST /login",

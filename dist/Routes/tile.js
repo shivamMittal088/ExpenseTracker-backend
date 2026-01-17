@@ -65,18 +65,22 @@ tileRouter.delete("/tiles/remove/:id", userAuth_1.default, async (req, res) => {
         const authReq = req;
         const loggedInUserId = authReq.user._id;
         const tileId = req.params.id;
-        const deletedTile = await TilesSchema_1.default.deleteOne({
-            userId: loggedInUserId,
-            _id: tileId,
-            isBuiltIn: false // prevent deleting default tiles .
-        });
+        // Check if tile exists and belongs to user
+        const tile = await TilesSchema_1.default.findOne({ _id: tileId, userId: loggedInUserId });
+        if (!tile) {
+            return res.status(404).json({ message: "Tile not found" });
+        }
+        if (tile.isBuiltIn) {
+            return res.status(403).json({ message: "Cannot delete built-in tiles" });
+        }
+        await TilesSchema_1.default.deleteOne({ _id: tileId, userId: loggedInUserId });
         (0, logger_1.logEvent)("info", "Tile removed", {
             route: "DELETE /tiles/remove/:id",
             userId: loggedInUserId,
             tileId,
-            deletedCount: deletedTile.deletedCount,
+            tileName: tile.name,
         });
-        res.status(201).send("tile deleted successfully");
+        res.status(200).json({ message: "Tile deleted successfully", tileId });
     }
     catch (err) {
         (0, logger_1.logApiError)(req, err, { route: "DELETE /tiles/remove/:id" });
