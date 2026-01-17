@@ -12,8 +12,9 @@ const expressRouter = express_1.default.Router();
 const parseBool = (value) => value === true || value === "true" || value === "1" || value === 1;
 expressRouter.post("/expense/add", userAuth_1.default, async (req, res, next) => {
     try {
-        const { amount, category, notes, payment_mode, currency, occurredAt } = req.body || {};
-        const userId = req.user?._id;
+        const { amount, category, notes, payment_mode, currency, occurredAt, userId: bodyUserId } = req.body || {};
+        const userId = req.user?._id || bodyUserId; // fallback to body for Postman testing
+        // Normalize payment_mode: "CASH" -> "cash", "upi" -> "UPI"
         const normalizedPaymentMode = typeof payment_mode === "string"
             ? payment_mode.toLowerCase() === "upi"
                 ? "UPI"
@@ -21,8 +22,17 @@ expressRouter.post("/expense/add", userAuth_1.default, async (req, res, next) =>
             : "";
         const allowedPaymentModes = new Set(["cash", "card", "bank_transfer", "wallet", "UPI"]);
         const errors = [];
+        /*
+        // With Array (slower) - has to check each item one by one
+        const allowedModes = ["cash", "card", "bank_transfer", "wallet", "UPI"];
+        allowedModes.includes("UPI");  // O(n) - checks 5 items
+  
+        // With Set (faster) - hash-based lookup
+        const allowedModes = new Set(["cash", "card", "bank_transfer", "wallet", "UPI"]);
+        allowedModes.has("UPI");  // O(1) - instant
+        */
         if (typeof amount !== "number" || Number.isNaN(amount) || amount <= 0) {
-            errors.push("amount must be a positive number");
+            errors.push("Enter valid amount");
         }
         if (!category || typeof category.name !== "string" || !category.name.trim()) {
             errors.push("category.name is required");
@@ -39,19 +49,11 @@ expressRouter.post("/expense/add", userAuth_1.default, async (req, res, next) =>
         if (notes && typeof notes !== "string") {
             errors.push("notes must be a string");
         }
-        // Optional occurredAt: if missing/null/empty, default to server now; else parse and shift using client offset
-        let occurredAtDate = new Date();
-        if (occurredAt !== undefined && occurredAt !== null && occurredAt !== "") {
-            const parsed = new Date(occurredAt);
-            if (Number.isNaN(parsed.getTime())) {
-                errors.push("occurredAt must be a valid date string");
-            }
-            else {
-                const clientOffset = Number(req.query.tzOffsetMinutes);
-                const offsetMinutes = Number.isFinite(clientOffset) ? clientOffset : parsed.getTimezoneOffset();
-                occurredAtDate = new Date(parsed.getTime() + offsetMinutes * 60000);
-            }
-        }
+        // Use occurredAt from request if user picked a custom date/time, otherwise use current server time + IST offset
+        const IST_OFFSET_MS = 330 * 60 * 1000;
+        const occurredAtDate = occurredAt
+            ? new Date(occurredAt) // User selected date/time from calendar/timepicker
+            : new Date(Date.now() + IST_OFFSET_MS); // Default: current time in IST
         if (errors.length) {
             (0, logger_1.logEvent)("warn", "Expense validation failed", {
                 route: "POST /expense/add",
@@ -93,41 +95,22 @@ expressRouter.post("/expense/add", userAuth_1.default, async (req, res, next) =>
         return res.status(500).json({ message: "Failed to add expense" });
     }
 });
-// Fetch expenses for a given local calendar date (YYYY-MM-DD), honoring optional tzOffsetMinutes
+// Fetch expenses for a given date (YYYY-MM-DD)
 expressRouter.get("/expense/:date", userAuth_1.default, async (req, res) => {
     try {
         const userId = req.user._id;
         const rawDate = req.params.date;
-        if (!rawDate || typeof rawDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
-            (0, logger_1.logEvent)("warn", "Invalid expense date format", {
-                route: "GET /expense/:date",
-                userId,
-                rawDate,
-            });
-            return res.status(400).json({ message: "Invalid date format. Use YYYY-MM-DD" });
-        }
-        const localStart = new Date(rawDate + "T00:00:00");
-        if (Number.isNaN(localStart.getTime())) {
-            (0, logger_1.logEvent)("warn", "Invalid expense calendar date", {
-                route: "GET /expense/:date",
-                userId,
-                rawDate,
-            });
-            return res.status(400).json({ message: "Invalid calendar date" });
-        }
-        const clientOffset = Number(req.query.tzOffsetMinutes);
-        const offsetMinutes = Number.isFinite(clientOffset) ? clientOffset : localStart.getTimezoneOffset();
-        const utcStart = new Date(localStart.getTime() + offsetMinutes * 60000);
-        const utcEnd = new Date(utcStart);
-        utcEnd.setDate(utcEnd.getDate() + 1);
+        // Create date range for the day
+        const startOfDay = new Date(rawDate + "T00:00:00.000Z");
+        const endOfDay = new Date(rawDate + "T23:59:59.999Z");
         const includeHidden = parseBool(req.query.includeHidden);
         const onlyHidden = parseBool(req.query.onlyHidden);
         const expenseTransactions = await ExpenseSchema_1.default.find({
             userId,
             ...(onlyHidden ? { deleted: true } : includeHidden ? {} : { deleted: false }),
             occurredAt: {
-                $gte: utcStart,
-                $lt: utcEnd,
+                $gte: startOfDay,
+                $lte: endOfDay,
             },
         }).sort({ occurredAt: -1 });
         (0, logger_1.logEvent)("info", "Expense list fetched", {
@@ -242,6 +225,7 @@ expressRouter.patch("/expense/:expenseId", userAuth_1.default, async (req, res) 
             }
         }
         if (payment_mode !== undefined) {
+            // Normalize payment_mode: "CASH" -> "cash", "upi" -> "UPI"
             const normalizedPaymentMode = typeof payment_mode === "string"
                 ? payment_mode.toLowerCase() === "upi"
                     ? "UPI"
@@ -269,9 +253,7 @@ expressRouter.patch("/expense/:expenseId", userAuth_1.default, async (req, res) 
                 errors.push("occurredAt must be a valid date string");
             }
             else {
-                const clientOffset = Number(req.query.tzOffsetMinutes);
-                const offsetMinutes = Number.isFinite(clientOffset) ? clientOffset : parsed.getTimezoneOffset();
-                updateDoc.occurredAt = new Date(parsed.getTime() + offsetMinutes * 60000);
+                updateDoc.occurredAt = parsed; // Store as-is (UTC)
             }
         }
         if (errors.length) {

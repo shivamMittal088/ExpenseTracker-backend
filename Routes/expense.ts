@@ -31,7 +31,7 @@ expressRouter.post(
   userAuth,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { amount, category, notes, payment_mode, currency, occurredAt, userId: bodyUserId } = req.body || {};
+      const { amount, category, notes, payment_mode, currency, occurredAt, userId: bodyUserId} = req.body || {};
       const userId = (req as any).user?._id || bodyUserId; // fallback to body for Postman testing
 
       // Normalize payment_mode: "CASH" -> "cash", "upi" -> "UPI"
@@ -44,6 +44,7 @@ expressRouter.post(
 
       const allowedPaymentModes = new Set(["cash", "card", "bank_transfer", "wallet", "UPI"]);
       const errors: string[] = [];
+
       /*
       // With Array (slower) - has to check each item one by one
       const allowedModes = ["cash", "card", "bank_transfer", "wallet", "UPI"];
@@ -79,18 +80,11 @@ expressRouter.post(
         errors.push("notes must be a string");
       }
 
-      // Optional occurredAt: if missing/null/empty, default to server now; else parse and shift using client offset
-      let occurredAtDate: Date = new Date();
-      if (occurredAt !== undefined && occurredAt !== null && occurredAt !== "") {
-        const parsed = new Date(occurredAt);
-        if (Number.isNaN(parsed.getTime())) {
-          errors.push("occurredAt must be a valid date string");
-        } else {
-          const clientOffset = Number(req.query.tzOffsetMinutes);
-          const offsetMinutes = Number.isFinite(clientOffset) ? clientOffset : parsed.getTimezoneOffset();
-          occurredAtDate = new Date(parsed.getTime() + offsetMinutes * 60000);
-        }
-      }
+      // Use occurredAt from request if user picked a custom date/time, otherwise use current server time + IST offset
+      const IST_OFFSET_MS = 330 * 60 * 1000;
+      const occurredAtDate = occurredAt 
+        ? new Date(occurredAt)  // User selected date/time from calendar/timepicker
+        : new Date(Date.now() + IST_OFFSET_MS);  // Default: current time in IST
 
       if (errors.length) {
         logEvent("warn", "Expense validation failed", {
@@ -139,37 +133,15 @@ expressRouter.post(
   }
 );
 
-// Fetch expenses for a given local calendar date (YYYY-MM-DD), honoring optional tzOffsetMinutes
+// Fetch expenses for a given date (YYYY-MM-DD)
 expressRouter.get("/expense/:date", userAuth, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user._id;
     const rawDate = req.params.date;
 
-    if (!rawDate || typeof rawDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
-      logEvent("warn", "Invalid expense date format", {
-        route: "GET /expense/:date",
-        userId,
-        rawDate,
-      });
-      return res.status(400).json({ message: "Invalid date format. Use YYYY-MM-DD" });
-    }
-
-    const localStart = new Date(rawDate + "T00:00:00");
-    if (Number.isNaN(localStart.getTime())) {
-      logEvent("warn", "Invalid expense calendar date", {
-        route: "GET /expense/:date",
-        userId,
-        rawDate,
-      });
-      return res.status(400).json({ message: "Invalid calendar date" });
-    }
-
-    const clientOffset = Number(req.query.tzOffsetMinutes);
-    const offsetMinutes = Number.isFinite(clientOffset) ? clientOffset : localStart.getTimezoneOffset();
-
-    const utcStart = new Date(localStart.getTime() + offsetMinutes * 60000);
-    const utcEnd = new Date(utcStart);
-    utcEnd.setDate(utcEnd.getDate() + 1);
+    // Create date range for the day
+    const startOfDay = new Date(rawDate + "T00:00:00.000Z");
+    const endOfDay = new Date(rawDate + "T23:59:59.999Z");
 
     const includeHidden = parseBool(req.query.includeHidden);
     const onlyHidden = parseBool(req.query.onlyHidden);
@@ -178,8 +150,8 @@ expressRouter.get("/expense/:date", userAuth, async (req: Request, res: Response
       userId,
       ...(onlyHidden ? { deleted: true } : includeHidden ? {} : { deleted: false }),
       occurredAt: {
-        $gte: utcStart,
-        $lt: utcEnd,
+        $gte: startOfDay,
+        $lte: endOfDay,
       },
     }).sort({ occurredAt: -1 });
 
@@ -349,9 +321,7 @@ expressRouter.patch(
         if (Number.isNaN(parsed.getTime())) {
           errors.push("occurredAt must be a valid date string");
         } else {
-          const clientOffset = Number(req.query.tzOffsetMinutes);
-          const offsetMinutes = Number.isFinite(clientOffset) ? clientOffset : parsed.getTimezoneOffset();
-          updateDoc.occurredAt = new Date(parsed.getTime() + offsetMinutes * 60000);
+          updateDoc.occurredAt = parsed; // Store as-is (UTC)
         }
       }
 
