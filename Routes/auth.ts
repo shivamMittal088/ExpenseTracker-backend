@@ -126,6 +126,8 @@ authRouter.post("/login", async (req:  Request, res: Response) => {
   }
 });
 
+
+
 /* ---------- Get Current User ---------- */
 authRouter.get("/me", userAuth, (req: Request, res: Response) => {
   logEvent("info", "Fetched current user", {
