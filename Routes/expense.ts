@@ -6,6 +6,21 @@ import { logApiError, logEvent } from "../utils/logger";
 
 const expressRouter = express.Router();
 
+// Interface for expense document
+interface ExpenseDoc {
+  amount: number;
+  category: {
+    name: string;
+    color: string;
+    emoji: string;
+  };
+  notes?: string;
+  payment_mode: string;
+  occurredAt: Date;
+  userId: mongoose.Types.ObjectId | string;
+  currency?: string;
+}
+
 const parseBool = (value: unknown): boolean =>
   value === true || value === "true" || value === "1" || value === 1;
 
@@ -16,9 +31,10 @@ expressRouter.post(
   userAuth,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { amount, category, notes, payment_mode, currency, occurredAt } = req.body || {};
-      const userId = (req as any).user?._id;
+      const { amount, category, notes, payment_mode, currency, occurredAt, userId: bodyUserId } = req.body || {};
+      const userId = (req as any).user?._id || bodyUserId; // fallback to body for Postman testing
 
+      // Normalize payment_mode: "CASH" -> "cash", "upi" -> "UPI"
       const normalizedPaymentMode =
         typeof payment_mode === "string"
           ? payment_mode.toLowerCase() === "upi"
@@ -28,9 +44,19 @@ expressRouter.post(
 
       const allowedPaymentModes = new Set(["cash", "card", "bank_transfer", "wallet", "UPI"]);
       const errors: string[] = [];
+      /*
+      // With Array (slower) - has to check each item one by one
+      const allowedModes = ["cash", "card", "bank_transfer", "wallet", "UPI"];
+      allowedModes.includes("UPI");  // O(n) - checks 5 items
+
+      // With Set (faster) - hash-based lookup
+      const allowedModes = new Set(["cash", "card", "bank_transfer", "wallet", "UPI"]);
+      allowedModes.has("UPI");  // O(1) - instant
+      */
+
 
       if (typeof amount !== "number" || Number.isNaN(amount) || amount <= 0) {
-        errors.push("amount must be a positive number");
+        errors.push("Enter valid amount");
       }
 
       if (!category || typeof category.name !== "string" || !category.name.trim()) {
@@ -293,6 +319,7 @@ expressRouter.patch(
       }
 
       if (payment_mode !== undefined) {
+        // Normalize payment_mode: "CASH" -> "cash", "upi" -> "UPI"
         const normalizedPaymentMode =
           typeof payment_mode === "string"
             ? payment_mode.toLowerCase() === "upi"
