@@ -133,6 +133,9 @@ expressRouter.post(
   }
 );
 
+
+
+
 // Fetch expenses for a given date (YYYY-MM-DD)
 expressRouter.get("/expense/:date", userAuth, async (req: Request, res: Response) => {
   try {
@@ -233,6 +236,9 @@ expressRouter.patch(
     }
   }
 );
+
+
+
 
 // Update an expense (amount, category, notes, payment_mode, currency, occurredAt)
 expressRouter.patch(
