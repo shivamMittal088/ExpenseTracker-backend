@@ -40,12 +40,18 @@ profileRouter.get(
         return res.status(404).json({ message: "User not found" });
       }
 
+      // Ensure monthlyIncome has a default value for older users who don't have the field
+      const profileWithDefaults = {
+        ...profile,
+        monthlyIncome: profile.monthlyIncome ?? 0,
+      };
+
       logEvent("info", "Profile fetched", {
         route: "GET /profile/view",
         userId: loggedInUserId,
       });
 
-      return res.status(200).json(profile);
+      return res.status(200).json(profileWithDefaults);
     } catch (err: any) {
       logApiError(req, err, { route: "GET /profile/view" });
       return res.status(500).json({ error: err?.message ?? "Internal Server Error" });

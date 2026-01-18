@@ -65,6 +65,11 @@ const UserSchema = new mongoose_1.Schema({
         enum: ["INR", "USD", "EUR"],
         default: "INR",
     },
+    monthlyIncome: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
     preferences: {
         darkMode: {
             type: Boolean,

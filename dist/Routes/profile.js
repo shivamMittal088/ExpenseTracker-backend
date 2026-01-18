@@ -27,11 +27,16 @@ profileRouter.get("/profile/view", userAuth_1.default, async (req, res, next) =>
         if (!profile) {
             return res.status(404).json({ message: "User not found" });
         }
+        // Ensure monthlyIncome has a default value for older users who don't have the field
+        const profileWithDefaults = {
+            ...profile,
+            monthlyIncome: profile.monthlyIncome ?? 0,
+        };
         (0, logger_1.logEvent)("info", "Profile fetched", {
             route: "GET /profile/view",
             userId: loggedInUserId,
         });
-        return res.status(200).json(profile);
+        return res.status(200).json(profileWithDefaults);
     }
     catch (err) {
         (0, logger_1.logApiError)(req, err, { route: "GET /profile/view" });
@@ -49,7 +54,7 @@ profileRouter.patch("/profile/update", userAuth_1.default, async (req, res) => {
             return res.status(401).json({ message: "Not authenticated" });
         }
         const loggedInUserId = req.user._id;
-        const { name, statusMessage, currency, preferences } = req.body;
+        const { name, statusMessage, currency, preferences, monthlyIncome } = req.body;
         // Build update object with only allowed fields
         const updateData = {};
         if (name !== undefined)
@@ -60,6 +65,8 @@ profileRouter.patch("/profile/update", userAuth_1.default, async (req, res) => {
             updateData.currency = currency;
         if (preferences !== undefined)
             updateData.preferences = preferences;
+        if (monthlyIncome !== undefined)
+            updateData.monthlyIncome = monthlyIncome;
         if (Object.keys(updateData).length === 0) {
             return res.status(400).json({ message: "No valid fields to update" });
         }
