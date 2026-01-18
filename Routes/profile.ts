@@ -68,7 +68,7 @@ profileRouter.patch(
       }
 
       const loggedInUserId = req.user._id;
-      const { name, statusMessage, currency, preferences } = req.body;
+      const { name, statusMessage, currency, preferences, monthlyIncome } = req.body;
 
       // Build update object with only allowed fields
       const updateData: Record<string, unknown> = {};
@@ -76,6 +76,7 @@ profileRouter.patch(
       if (statusMessage !== undefined) updateData.statusMessage = statusMessage;
       if (currency !== undefined) updateData.currency = currency;
       if (preferences !== undefined) updateData.preferences = preferences;
+      if (monthlyIncome !== undefined) updateData.monthlyIncome = monthlyIncome;
 
       if (Object.keys(updateData).length === 0) {
         return res.status(400).json({ message: "No valid fields to update" });

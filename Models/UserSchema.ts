@@ -14,6 +14,7 @@ export interface IUser extends Document {
   photoURL?: string;
   statusMessage?: string;
   currency: "INR" | "USD" | "EUR";
+  monthlyIncome: number;
   preferences: UserPreferences;
   createdAt: Date;
   updatedAt: Date;
@@ -55,6 +56,12 @@ const UserSchema = new Schema<IUser>(
     type: String,
     enum: ["INR", "USD", "EUR"],
     default: "INR",
+    },
+
+    monthlyIncome: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
 
     preferences: {
