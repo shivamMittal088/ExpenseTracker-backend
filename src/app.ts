@@ -22,7 +22,7 @@ const ALLOWED_ORIGINS = FRONTEND_ORIGIN.split(",").map((o) => o.trim()).filter(B
 
 // Middlewares
 app.use(cors({
-  origin: true,
+  origin: ALLOWED_ORIGINS,
   credentials: true,
 }));
 
