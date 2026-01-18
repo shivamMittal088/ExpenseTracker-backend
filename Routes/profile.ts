@@ -1,9 +1,12 @@
 import express, { Request, Response, NextFunction } from "express";
+import path from "path";
+import fs from "fs";
 import User from "../Models/UserSchema";
 import LoginHistory from "../Models/LoginHistorySchema";
 import userAuth from "../Middlewares/userAuth";
 import { IUser } from "../Models/UserSchema";
 import { logApiError, logEvent } from "../utils/logger";
+import { avatarUpload as upload, avatarUploadsDir as uploadsDir } from "../config/multer";
 
 declare global {
   namespace Express {
@@ -142,6 +145,78 @@ profileRouter.get(
       return res.status(200).json(history);
     } catch (err: any) {
       logApiError(req, err, { route: "GET /profile/login-history" });
+      return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
+    }
+  }
+);
+
+/**
+ * POST /profile/upload-avatar
+ * - Requires userAuth middleware
+ * - Uploads a profile photo and updates the user's photoURL
+ */
+profileRouter.post(
+  "/profile/upload-avatar",
+  userAuth,
+  upload.single("avatar"),
+  async (req: Request, res: Response) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const loggedInUserId = req.user._id;
+      
+      // Get the old photo URL to delete the old file
+      const oldUser = await User.findById(loggedInUserId).select("photoURL").lean();
+      
+      // Build the photo URL (relative path that will be served statically)
+      const photoURL = `/uploads/avatars/${req.file.filename}`;
+
+      // Update user's photoURL in database
+      const updatedProfile = await User.findByIdAndUpdate(
+        loggedInUserId,
+        { $set: { photoURL } },
+        { new: true, runValidators: true }
+      ).select("-password").lean();
+
+      if (!updatedProfile) {
+        // Clean up uploaded file if user not found
+        fs.unlinkSync(req.file.path);
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Delete old avatar file if it exists
+      if (oldUser?.photoURL && oldUser.photoURL.startsWith("/uploads/avatars/")) {
+        const oldFilePath = path.join(__dirname, "..", oldUser.photoURL);
+        if (fs.existsSync(oldFilePath)) {
+          fs.unlinkSync(oldFilePath);
+        }
+      }
+
+      logEvent("info", "Avatar uploaded", {
+        route: "POST /profile/upload-avatar",
+        userId: loggedInUserId,
+        filename: req.file.filename,
+      });
+
+      return res.status(200).json({
+        message: "Avatar uploaded successfully",
+        photoURL,
+        profile: updatedProfile,
+      });
+    } catch (err: any) {
+      // Clean up uploaded file on error
+      if (req.file) {
+        try {
+          fs.unlinkSync(req.file.path);
+        } catch {}
+      }
+      logApiError(req, err, { route: "POST /profile/upload-avatar" });
       return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
   }

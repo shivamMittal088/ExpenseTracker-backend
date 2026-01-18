@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
+import path from "path";
 import { axiomRequestLogger } from "../Middlewares/axiomLogger";
 import { sendLog } from "../config/axiomClient";
 
@@ -29,6 +30,9 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 app.use(axiomRequestLogger);
+
+// Serve static files from uploads directory
+app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 
 // Routes
 app.use("/api/auth/", authRouter);

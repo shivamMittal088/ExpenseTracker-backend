@@ -7,6 +7,7 @@ const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const dotenv_1 = __importDefault(require("dotenv"));
+const path_1 = __importDefault(require("path"));
 const axiomLogger_1 = require("../Middlewares/axiomLogger");
 const auth_1 = __importDefault(require("../Routes/auth"));
 const profile_1 = __importDefault(require("../Routes/profile"));
@@ -25,6 +26,8 @@ app.use((0, cors_1.default)({
 app.use(express_1.default.json());
 app.use((0, cookie_parser_1.default)());
 app.use(axiomLogger_1.axiomRequestLogger);
+// Serve static files from uploads directory
+app.use("/uploads", express_1.default.static(path_1.default.join(__dirname, "..", "uploads")));
 // Routes
 app.use("/api/auth/", auth_1.default);
 app.use("/api/", profile_1.default);
