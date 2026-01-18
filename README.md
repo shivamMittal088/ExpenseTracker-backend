@@ -142,14 +142,24 @@ Set the `AXIOM_*` environment variables to enable. Falls back to console in deve
 - [ ] Private accounts
 - [ ] Following feature
 - [ ] PWA support
-- [ ] Advanced expense filtering
 - [ ] Analytics dashboard
+- [ ] Recurring expenses
+- [ ] Budget limits & alerts
+- [ ] Export expenses (CSV/PDF)
 
 ### Implemented
 - [x] Add expense with validation and payment mode normalization
 - [x] Fetch daily expenses by local date with timezone handling
 - [x] Soft hide/restore expenses via `deleted` flag
-- [x] Update expense fields (amount, category, notes, payment mode, currency)
+- [x] Update expense fields (amount, category, notes, payment mode, currency, occurredAt)
 - [x] Auth-protected routes using `userAuth` middleware
 - [x] Single-device login enforcement
-- [x] Session token management
+- [x] Session token management with expiry
+- [x] User signup with password hashing (bcrypt)
+- [x] User login with JWT HTTP-only cookies
+- [x] Password update with session invalidation
+- [x] User profile view and update (name, statusMessage, currency, preferences)
+- [x] Login history tracking (IP, browser, OS, device)
+- [x] Category tiles (CRUD) with built-in and user-created tiles
+- [x] Axiom logging integration for production monitoring
+- [x] Request/error logging with user context
