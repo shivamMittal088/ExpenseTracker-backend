@@ -122,7 +122,7 @@ authRouter.post("/signup", async (req:  Request, res: Response) => {
       emailId,
     });
 
-    res.json({ message: "Signup successful" });
+    res.json({ message: "Signup successful", token });
   } catch (err: any) {
     logApiError(req, err, { route: "POST /signup" });
     res.status(400).json({ err: err.message });
@@ -184,7 +184,7 @@ authRouter.post("/login", async (req:  Request, res: Response) => {
       emailId,
     });
 
-    res.json(safeUser);
+    res.json({ ...safeUser, token });
   } catch (err: any) {
     logApiError(req, err, { route: "POST /login" });
     res.status(400).json({ err: err.message });

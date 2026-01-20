@@ -78,9 +78,17 @@ const JWT_SECRET = "MYSecretKey";
 
 const userAuth = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const token = req.cookies?.token;
+    // Check cookie first, then Authorization header as fallback (for iOS)
+    let token = req.cookies?.token;
+    
+    if (!token) {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.substring(7);
+      }
+    }
 
-    // 1️⃣ No cookie
+    // 1️⃣ No token found anywhere
     if (!token) {
       return res.status(401).json({ code: "NO_TOKEN" });
     }
