@@ -3,23 +3,37 @@ import path from "path";
 import fs from "fs";
 import { Request } from "express";
 
-// Ensure uploads directory exists
-const uploadsDir = path.join(__dirname, "..", "uploads", "avatars");
-if (!fs.existsSync(uploadsDir)) {
+// Check if running on Vercel (serverless) - filesystem is read-only except /tmp
+const isVercel = process.env.VERCEL === "1" || process.env.VERCEL_ENV;
+
+// Use /tmp on Vercel, local uploads folder otherwise
+const uploadsDir = isVercel 
+  ? "/tmp/avatars" 
+  : path.join(__dirname, "..", "uploads", "avatars");
+
+// Only create directory if it doesn't exist (skip on Vercel cold start for memory storage)
+if (!isVercel && !fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Configure multer storage for avatar uploads
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, uploadsDir);
-  },
-  filename: (req, _file, cb) => {
-    const userId = (req as any).user?._id || "unknown";
-    const ext = path.extname(_file.originalname).toLowerCase() || ".jpg";
-    cb(null, `${userId}-${Date.now()}${ext}`);
-  },
-});
+// For Vercel, use memory storage (files stored in buffer, not disk)
+// For local dev, use disk storage
+const storage = isVercel
+  ? multer.memoryStorage()
+  : multer.diskStorage({
+      destination: (_req, _file, cb) => {
+        // Create /tmp/avatars on Vercel if needed
+        if (!fs.existsSync(uploadsDir)) {
+          fs.mkdirSync(uploadsDir, { recursive: true });
+        }
+        cb(null, uploadsDir);
+      },
+      filename: (req, _file, cb) => {
+        const userId = (req as any).user?._id || "unknown";
+        const ext = path.extname(_file.originalname).toLowerCase() || ".jpg";
+        cb(null, `${userId}-${Date.now()}${ext}`);
+      },
+    });
 
 // File filter for image uploads
 const fileFilter = (
@@ -46,3 +60,6 @@ export const avatarUpload = multer({
 
 // Export uploads directory path for use in other files
 export const avatarUploadsDir = uploadsDir;
+
+// Export isVercel flag for other files to check
+export { isVercel };
