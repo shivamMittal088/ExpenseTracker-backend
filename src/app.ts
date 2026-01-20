@@ -36,6 +36,11 @@ app.use(cors({
       return callback(null, true);
     }
     
+    // Allow custom domain
+    if (origin.endsWith('track-expense.com')) {
+      return callback(null, true);
+    }
+    
     // Allow localhost for development
     if (origin.startsWith('http://localhost:')) {
       return callback(null, true);
