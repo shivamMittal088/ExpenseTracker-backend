@@ -382,4 +382,50 @@ expressRouter.patch(
   }
 );
 
+
+// Fetch expenses for a date range (for analytics - reduces 30+ API calls to 1)
+expressRouter.get("/expenses/range", userAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user._id;
+    const { startDate, endDate } = req.query;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({ message: "startDate and endDate are required" });
+    }
+
+    const start = new Date(startDate as string + "T00:00:00.000Z");
+    const end = new Date(endDate as string + "T23:59:59.999Z");
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return res.status(400).json({ message: "Invalid date format. Use YYYY-MM-DD" });
+    }
+
+    const expenses = await Expense.find({
+      userId,
+      deleted: false,
+      occurredAt: {
+        $gte: start,
+        $lte: end,
+      },
+    }).sort({ occurredAt: -1 });
+
+    logEvent("info", "Expense range fetched", {
+      route: "GET /expenses/range",
+      userId,
+      count: expenses.length,
+      startDate,
+      endDate,
+    });
+
+    return res.json({
+      message: "Expenses fetched successfully",
+      data: expenses,
+    });
+  } catch (err) {
+    logApiError(req, err, { route: "GET /expenses/range" });
+    return res.status(500).json({ message: "Failed to load expenses" });
+  }
+});
+
+
 export default expressRouter;
