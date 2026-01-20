@@ -24,12 +24,19 @@ app.use((0, cors_1.default)({
         // Allow requests with no origin (mobile apps, curl, etc.)
         if (!origin)
             return callback(null, true);
+        // Allow exact matches from ALLOWED_ORIGINS
         if (ALLOWED_ORIGINS.includes(origin)) {
-            callback(null, true);
+            return callback(null, true);
         }
-        else {
-            callback(null, false);
+        // Allow all Vercel preview deployments for this project
+        if (origin.endsWith('.vercel.app') && origin.includes('expense-tracker')) {
+            return callback(null, true);
         }
+        // Allow localhost for development
+        if (origin.startsWith('http://localhost:')) {
+            return callback(null, true);
+        }
+        callback(null, false);
     },
     credentials: true,
 }));
