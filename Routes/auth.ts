@@ -111,7 +111,7 @@ authRouter.post("/signup", async (req:  Request, res: Response) => {
 
     res.cookie("token", token, {
       httpOnly: true,
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      sameSite: "lax", // Safe now - requests come through same domain via Vercel rewrites
       secure: process.env.NODE_ENV === "production",
       expires: expiresAt,
     });
@@ -168,7 +168,7 @@ authRouter.post("/login", async (req:  Request, res: Response) => {
 
     res.cookie("token", token, {
       httpOnly: true,
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      sameSite: "lax", // Safe now - requests come through same domain via Vercel rewrites
       secure: process.env.NODE_ENV === "production",
       expires: expiresAt,
     });
