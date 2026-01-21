@@ -100,16 +100,14 @@ authRouter.post("/signup", async (req:  Request, res: Response) => {
 
     const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_MS);
 
-    // ======== COMMENTED: Single device login restriction ========
-    // Delete any existing session & create new
+    // ======== COMMENTED: Session token system disabled for multi-device login ========
     // await SessionToken. findOneAndDelete({ userId: savedUser._id });
-    
-    await SessionToken. create({
-      userId: savedUser._id,
-      token:  token,
-      expiresAt: expiresAt
-    });
-    // ======== END: Single device login restriction ========
+    // await SessionToken. create({
+    //   userId: savedUser._id,
+    //   token:  token,
+    //   expiresAt: expiresAt
+    // });
+    // ======== END: Session token system disabled ========
 
     res.cookie("token", token, {
       httpOnly: true,
@@ -149,10 +147,9 @@ authRouter.post("/login", async (req:  Request, res: Response) => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    // ======== COMMENTED: Single device login restriction ========
-    // Delete old session (kicks out old device)
+    // ======== COMMENTED: Session token system disabled for multi-device login ========
     // await SessionToken.findOneAndDelete({ userId: user._id });
-    // ======== END: Single device login restriction ========
+    // ======== END: Session token system disabled ========
 
     // Generate new token
     const token = jwt.sign(
@@ -163,12 +160,13 @@ authRouter.post("/login", async (req:  Request, res: Response) => {
 
     const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_MS);
 
-    // Create new session
-    await SessionToken.create({
-      userId: user._id,
-      token: token,
-      expiresAt: expiresAt
-    });
+    // ======== COMMENTED: Session token system disabled for multi-device login ========
+    // await SessionToken.create({
+    //   userId: user._id,
+    //   token: token,
+    //   expiresAt: expiresAt
+    // });
+    // ======== END: Session token system disabled ========
 
     res.cookie("token", token, {
       httpOnly: true,
@@ -216,15 +214,18 @@ authRouter.get("/me", userAuth, (req: Request, res: Response) => {
 /* ---------- Logout ---------- */
 authRouter.post("/logout", userAuth, async (req: Request, res:  Response) => {
   try {
-    const userId = (req as any).user._id;
-
-    await SessionToken.deleteOne({ userId:  userId });
+    // ======== COMMENTED: Session token system disabled for multi-device login ========
+    // const token = req.cookies?.token || req.headers.authorization?.substring(7);
+    // if (token) {
+    //   await SessionToken.deleteOne({ token: token });
+    // }
+    // ======== END: Session token system disabled ========
 
     res.clearCookie("token");
 
     logEvent("info", "User logged out", {
       route: "POST /logout",
-      userId,
+      userId: (req as any).user._id,
     });
 
     res.json({ message: "Logged out successfully" });
@@ -257,7 +258,9 @@ authRouter.patch("/update/password", userAuth, async (req: Request, res: Respons
     user.password = hashPassword;
     await user.save();
 
-    await SessionToken.deleteOne({ userId: userId });
+    // ======== COMMENTED: Session token system disabled for multi-device login ========
+    // await SessionToken.deleteOne({ userId: userId });
+    // ======== END: Session token system disabled ========
 
     res.clearCookie("token");
 

@@ -5,7 +5,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const UserSchema_1 = __importDefault(require("../Models/UserSchema"));
-const SessionTokenSchema_1 = __importDefault(require("../Models/SessionTokenSchema"));
 const LoginHistorySchema_1 = __importDefault(require("../Models/LoginHistorySchema"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const bcrypt_1 = __importDefault(require("bcrypt"));
@@ -86,15 +85,14 @@ authRouter.post("/signup", async (req, res) => {
         const savedUser = await newUser.save();
         const token = jsonwebtoken_1.default.sign({ _id: savedUser._id }, "MYSecretKey", { expiresIn: "1h" });
         const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_MS);
-        // ======== COMMENTED: Single device login restriction ========
-        // Delete any existing session & create new
+        // ======== COMMENTED: Session token system disabled for multi-device login ========
         // await SessionToken. findOneAndDelete({ userId: savedUser._id });
-        await SessionTokenSchema_1.default.create({
-            userId: savedUser._id,
-            token: token,
-            expiresAt: expiresAt
-        });
-        // ======== END: Single device login restriction ========
+        // await SessionToken. create({
+        //   userId: savedUser._id,
+        //   token:  token,
+        //   expiresAt: expiresAt
+        // });
+        // ======== END: Session token system disabled ========
         res.cookie("token", token, {
             httpOnly: true,
             sameSite: "lax", // Safe now - requests come through same domain via Vercel rewrites
@@ -125,19 +123,19 @@ authRouter.post("/login", async (req, res) => {
         if (!isMatch) {
             return res.status(400).json({ message: "Invalid credentials" });
         }
-        // ======== COMMENTED: Single device login restriction ========
-        // Delete old session (kicks out old device)
+        // ======== COMMENTED: Session token system disabled for multi-device login ========
         // await SessionToken.findOneAndDelete({ userId: user._id });
-        // ======== END: Single device login restriction ========
+        // ======== END: Session token system disabled ========
         // Generate new token
         const token = jsonwebtoken_1.default.sign({ _id: user._id }, "MYSecretKey", { expiresIn: "1h" });
         const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_MS);
-        // Create new session
-        await SessionTokenSchema_1.default.create({
-            userId: user._id,
-            token: token,
-            expiresAt: expiresAt
-        });
+        // ======== COMMENTED: Session token system disabled for multi-device login ========
+        // await SessionToken.create({
+        //   userId: user._id,
+        //   token: token,
+        //   expiresAt: expiresAt
+        // });
+        // ======== END: Session token system disabled ========
         res.cookie("token", token, {
             httpOnly: true,
             sameSite: "lax", // Safe now - requests come through same domain via Vercel rewrites
@@ -174,12 +172,16 @@ authRouter.get("/me", userAuth_1.default, (req, res) => {
 /* ---------- Logout ---------- */
 authRouter.post("/logout", userAuth_1.default, async (req, res) => {
     try {
-        const userId = req.user._id;
-        await SessionTokenSchema_1.default.deleteOne({ userId: userId });
+        // ======== COMMENTED: Session token system disabled for multi-device login ========
+        // const token = req.cookies?.token || req.headers.authorization?.substring(7);
+        // if (token) {
+        //   await SessionToken.deleteOne({ token: token });
+        // }
+        // ======== END: Session token system disabled ========
         res.clearCookie("token");
         (0, logger_1.logEvent)("info", "User logged out", {
             route: "POST /logout",
-            userId,
+            userId: req.user._id,
         });
         res.json({ message: "Logged out successfully" });
     }
@@ -204,7 +206,9 @@ authRouter.patch("/update/password", userAuth_1.default, async (req, res) => {
         const hashPassword = await bcrypt_1.default.hash(newPassword, 10);
         user.password = hashPassword;
         await user.save();
-        await SessionTokenSchema_1.default.deleteOne({ userId: userId });
+        // ======== COMMENTED: Session token system disabled for multi-device login ========
+        // await SessionToken.deleteOne({ userId: userId });
+        // ======== END: Session token system disabled ========
         res.clearCookie("token");
         (0, logger_1.logEvent)("info", "User password updated", {
             route: "PATCH /update/password",
