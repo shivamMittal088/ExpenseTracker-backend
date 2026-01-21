@@ -10,12 +10,18 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const UserSchema_1 = __importDefault(require("../Models/UserSchema"));
-const SessionTokenSchema_1 = __importDefault(require("../Models/SessionTokenSchema"));
 const JWT_SECRET = "MYSecretKey";
 const userAuth = async (req, res, next) => {
     try {
-        const token = req.cookies?.token;
-        // 1️⃣ No cookie
+        // Check cookie first, then Authorization header as fallback (for iOS)
+        let token = req.cookies?.token;
+        if (!token) {
+            const authHeader = req.headers.authorization;
+            if (authHeader && authHeader.startsWith('Bearer ')) {
+                token = authHeader.substring(7);
+            }
+        }
+        // 1️⃣ No token found anywhere
         if (!token) {
             return res.status(401).json({ code: "NO_TOKEN" });
         }
@@ -30,16 +36,18 @@ const userAuth = async (req, res, next) => {
             }
             return res.status(401).json({ code: "INVALID_TOKEN" });
         }
+        // ======== COMMENTED: Single device login restriction ========
         // 3️⃣ Check if this token still exists in DB (single-device login)
-        const session = await SessionTokenSchema_1.default.findOne({ token });
-        if (!session) {
-            return res.status(401).json({ code: "LOGGED_IN_ELSEWHERE" });
-        }
+        // const session = await SessionToken.findOne({ token });
+        // if (!session) {
+        //   return res.status(401).json({ code: "LOGGED_IN_ELSEWHERE" });
+        // }
         // 4️⃣ Extra DB expiry check (safety)
-        if (session.expiresAt < new Date()) {
-            await SessionTokenSchema_1.default.deleteOne({ token });
-            return res.status(401).json({ code: "SESSION_EXPIRED" });
-        }
+        // if (session.expiresAt < new Date()) {
+        //   await SessionToken.deleteOne({ token });
+        //   return res.status(401).json({ code: "SESSION_EXPIRED" });
+        // }
+        // ======== END: Single device login restriction ========
         // 5️⃣ Load user
         const user = await UserSchema_1.default.findById(decoded._id);
         if (!user) {

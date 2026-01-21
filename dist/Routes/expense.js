@@ -297,4 +297,42 @@ expressRouter.patch("/expense/:expenseId", userAuth_1.default, async (req, res) 
         return res.status(500).json({ message: "Failed to update expense" });
     }
 });
+// Fetch expenses for a date range (for analytics - reduces 30+ API calls to 1)
+expressRouter.get("/expenses/range", userAuth_1.default, async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const { startDate, endDate } = req.query;
+        if (!startDate || !endDate) {
+            return res.status(400).json({ message: "startDate and endDate are required" });
+        }
+        const start = new Date(startDate + "T00:00:00.000Z");
+        const end = new Date(endDate + "T23:59:59.999Z");
+        if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+            return res.status(400).json({ message: "Invalid date format. Use YYYY-MM-DD" });
+        }
+        const expenses = await ExpenseSchema_1.default.find({
+            userId,
+            deleted: false,
+            occurredAt: {
+                $gte: start,
+                $lte: end,
+            },
+        }).sort({ occurredAt: -1 });
+        (0, logger_1.logEvent)("info", "Expense range fetched", {
+            route: "GET /expenses/range",
+            userId,
+            count: expenses.length,
+            startDate,
+            endDate,
+        });
+        return res.json({
+            message: "Expenses fetched successfully",
+            data: expenses,
+        });
+    }
+    catch (err) {
+        (0, logger_1.logApiError)(req, err, { route: "GET /expenses/range" });
+        return res.status(500).json({ message: "Failed to load expenses" });
+    }
+});
 exports.default = expressRouter;

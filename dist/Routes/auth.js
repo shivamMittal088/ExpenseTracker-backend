@@ -86,16 +86,18 @@ authRouter.post("/signup", async (req, res) => {
         const savedUser = await newUser.save();
         const token = jsonwebtoken_1.default.sign({ _id: savedUser._id }, "MYSecretKey", { expiresIn: "1h" });
         const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_MS);
+        // ======== COMMENTED: Single device login restriction ========
         // Delete any existing session & create new
-        await SessionTokenSchema_1.default.findOneAndDelete({ userId: savedUser._id });
+        // await SessionToken. findOneAndDelete({ userId: savedUser._id });
         await SessionTokenSchema_1.default.create({
             userId: savedUser._id,
             token: token,
             expiresAt: expiresAt
         });
+        // ======== END: Single device login restriction ========
         res.cookie("token", token, {
             httpOnly: true,
-            sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+            sameSite: "lax", // Safe now - requests come through same domain via Vercel rewrites
             secure: process.env.NODE_ENV === "production",
             expires: expiresAt,
         });
@@ -104,7 +106,7 @@ authRouter.post("/signup", async (req, res) => {
             userId: savedUser._id,
             emailId,
         });
-        res.json({ message: "Signup successful" });
+        res.json({ message: "Signup successful", token });
     }
     catch (err) {
         (0, logger_1.logApiError)(req, err, { route: "POST /signup" });
@@ -123,8 +125,10 @@ authRouter.post("/login", async (req, res) => {
         if (!isMatch) {
             return res.status(400).json({ message: "Invalid credentials" });
         }
+        // ======== COMMENTED: Single device login restriction ========
         // Delete old session (kicks out old device)
-        await SessionTokenSchema_1.default.findOneAndDelete({ userId: user._id });
+        // await SessionToken.findOneAndDelete({ userId: user._id });
+        // ======== END: Single device login restriction ========
         // Generate new token
         const token = jsonwebtoken_1.default.sign({ _id: user._id }, "MYSecretKey", { expiresIn: "1h" });
         const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_MS);
@@ -136,7 +140,7 @@ authRouter.post("/login", async (req, res) => {
         });
         res.cookie("token", token, {
             httpOnly: true,
-            sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+            sameSite: "lax", // Safe now - requests come through same domain via Vercel rewrites
             secure: process.env.NODE_ENV === "production",
             expires: expiresAt,
         });
@@ -148,7 +152,7 @@ authRouter.post("/login", async (req, res) => {
             userId: user._id,
             emailId,
         });
-        res.json(safeUser);
+        res.json({ ...safeUser, token });
     }
     catch (err) {
         (0, logger_1.logApiError)(req, err, { route: "POST /login" });
