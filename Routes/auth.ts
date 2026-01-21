@@ -100,14 +100,16 @@ authRouter.post("/signup", async (req:  Request, res: Response) => {
 
     const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_MS);
 
+    // ======== COMMENTED: Single device login restriction ========
     // Delete any existing session & create new
-    await SessionToken. findOneAndDelete({ userId: savedUser._id });
+    // await SessionToken. findOneAndDelete({ userId: savedUser._id });
     
     await SessionToken. create({
       userId: savedUser._id,
       token:  token,
       expiresAt: expiresAt
     });
+    // ======== END: Single device login restriction ========
 
     res.cookie("token", token, {
       httpOnly: true,
@@ -147,8 +149,10 @@ authRouter.post("/login", async (req:  Request, res: Response) => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
+    // ======== COMMENTED: Single device login restriction ========
     // Delete old session (kicks out old device)
-    await SessionToken.findOneAndDelete({ userId: user._id });
+    // await SessionToken.findOneAndDelete({ userId: user._id });
+    // ======== END: Single device login restriction ========
 
     // Generate new token
     const token = jwt.sign(

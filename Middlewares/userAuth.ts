@@ -104,18 +104,20 @@ const userAuth = async (req: AuthRequest, res: Response, next: NextFunction) => 
       return res.status(401).json({ code: "INVALID_TOKEN" });
     }
 
+    // ======== COMMENTED: Single device login restriction ========
     // 3️⃣ Check if this token still exists in DB (single-device login)
-    const session = await SessionToken.findOne({ token });
+    // const session = await SessionToken.findOne({ token });
 
-    if (!session) {
-      return res.status(401).json({ code: "LOGGED_IN_ELSEWHERE" });
-    }
+    // if (!session) {
+    //   return res.status(401).json({ code: "LOGGED_IN_ELSEWHERE" });
+    // }
 
     // 4️⃣ Extra DB expiry check (safety)
-    if (session.expiresAt < new Date()) {
-      await SessionToken.deleteOne({ token });
-      return res.status(401).json({ code: "SESSION_EXPIRED" });
-    }
+    // if (session.expiresAt < new Date()) {
+    //   await SessionToken.deleteOne({ token });
+    //   return res.status(401).json({ code: "SESSION_EXPIRED" });
+    // }
+    // ======== END: Single device login restriction ========
 
     // 5️⃣ Load user
     const user = await User.findById(decoded._id);
