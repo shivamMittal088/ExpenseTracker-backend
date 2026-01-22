@@ -336,7 +336,7 @@ expressRouter.get("/expenses/range", userAuth_1.default, async (req, res) => {
     }
 });
 // Get transaction count per day for heatmap (like LeetCode/GitHub contribution graph)
-expressRouter.get("/expenses/heatmap", userAuth_1.default, async (req, res) => {
+expressRouter.get("/expenses/heatmap/", userAuth_1.default, async (req, res) => {
     try {
         const userId = req.user._id;
         const { year } = req.query;
