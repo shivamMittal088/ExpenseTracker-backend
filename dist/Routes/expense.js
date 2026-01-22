@@ -335,4 +335,63 @@ expressRouter.get("/expenses/range", userAuth_1.default, async (req, res) => {
         return res.status(500).json({ message: "Failed to load expenses" });
     }
 });
+// Get transaction count per day for heatmap (like LeetCode/GitHub contribution graph)
+expressRouter.get("/expenses/heatmap", userAuth_1.default, async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const { year } = req.query;
+        // Default to current year if not provided
+        const targetYear = year ? parseInt(year) : new Date().getFullYear();
+        const startDate = new Date(`${targetYear}-01-01T00:00:00.000Z`);
+        const endDate = new Date(`${targetYear}-12-31T23:59:59.999Z`);
+        // Aggregate to get count of transactions per day
+        const heatmapData = await ExpenseSchema_1.default.aggregate([
+            {
+                $match: {
+                    userId: new mongoose_1.default.Types.ObjectId(userId),
+                    deleted: false,
+                    occurredAt: {
+                        $gte: startDate,
+                        $lte: endDate,
+                    },
+                },
+            },
+            {
+                $group: {
+                    _id: {
+                        $dateToString: { format: "%Y-%m-%d", date: "$occurredAt" },
+                    },
+                    count: { $sum: 1 },
+                    totalAmount: { $sum: "$amount" },
+                },
+            },
+            {
+                $project: {
+                    _id: 0,
+                    date: "$_id",
+                    count: 1,
+                    totalAmount: 1,
+                },
+            },
+            {
+                $sort: { date: 1 },
+            },
+        ]);
+        (0, logger_1.logEvent)("info", "Heatmap data fetched", {
+            route: "GET /expenses/heatmap",
+            userId,
+            year: targetYear,
+            daysWithTransactions: heatmapData.length,
+        });
+        return res.json({
+            message: "Heatmap data fetched successfully",
+            data: heatmapData,
+            year: targetYear,
+        });
+    }
+    catch (err) {
+        (0, logger_1.logApiError)(req, err, { route: "GET /expenses/heatmap" });
+        return res.status(500).json({ message: "Failed to load heatmap data" });
+    }
+});
 exports.default = expressRouter;

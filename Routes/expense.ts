@@ -6,19 +6,41 @@ import { logApiError, logEvent } from "../utils/logger";
 
 const expressRouter = express.Router();
 
+// ======== Interfaces ========
+
+// Category interface
+interface Category {
+  name: string;
+  color: string;
+  emoji: string;
+}
+
 // Interface for expense document
 interface ExpenseDoc {
   amount: number;
-  category: {
-    name: string;
-    color: string;
-    emoji: string;
-  };
+  category: Category;
   notes?: string;
   payment_mode: string;
   occurredAt: Date;
   userId: mongoose.Types.ObjectId | string;
   currency?: string;
+}
+
+// Interface for expense update document
+interface ExpenseUpdateDoc {
+  amount?: number;
+  category?: Category;
+  notes?: string | null;
+  payment_mode?: string;
+  currency?: string;
+  occurredAt?: Date;
+}
+
+// Interface for heatmap aggregation result
+interface HeatmapAggregate {
+  date: string;
+  count: number;
+  totalAmount: number;
 }
 
 const parseBool = (value: unknown): boolean =>
@@ -32,7 +54,7 @@ expressRouter.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { amount, category, notes, payment_mode, currency, occurredAt, userId: bodyUserId} = req.body || {};
-      const userId = (req as any).user?._id || bodyUserId; // fallback to body for Postman testing
+      const userId = req.user?._id || bodyUserId; // fallback to body for Postman testing
 
       // Normalize payment_mode: "CASH" -> "cash", "upi" -> "UPI"
       const normalizedPaymentMode =
@@ -95,7 +117,7 @@ expressRouter.post(
         return res.status(400).json({ message: errors.join("; ") });
       }
 
-      const expenseDoc: any = {
+      const expenseDoc: ExpenseDoc = {
         amount,
         category: {
           name: category.name.trim(),
@@ -139,7 +161,7 @@ expressRouter.post(
 // Fetch expenses for a given date (YYYY-MM-DD)
 expressRouter.get("/expense/:date", userAuth, async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user._id;
+    const userId = req.user!._id;
     const rawDate = req.params.date;
 
     // Create date range for the day
@@ -175,6 +197,9 @@ expressRouter.get("/expense/:date", userAuth, async (req: Request, res: Response
   }
 });
 
+
+
+
 // Soft hide / restore an expense
 expressRouter.patch(
   "/expense/:expenseId/hide",
@@ -182,7 +207,7 @@ expressRouter.patch(
   async (req: Request, res: Response) => {
     try {
       const { expenseId } = req.params;
-      const userId = (req as any).user._id;
+      const userId = req.user!._id;
       const { hide = true } = req.body ?? {};
 
       if (!mongoose.isValidObjectId(expenseId)) {
@@ -247,7 +272,7 @@ expressRouter.patch(
   async (req: Request, res: Response) => {
     try {
       const { expenseId } = req.params;
-      const userId = (req as any).user._id;
+      const userId = req.user!._id;
 
       if (!mongoose.isValidObjectId(expenseId)) {
         logEvent("warn", "Invalid expense id", {
@@ -260,7 +285,7 @@ expressRouter.patch(
 
       const { amount, category, notes, payment_mode, currency, occurredAt } = req.body || {};
 
-      const updateDoc: any = {};
+      const updateDoc: ExpenseUpdateDoc = {};
       const errors: string[] = [];
 
       if (amount !== undefined) {
@@ -383,10 +408,13 @@ expressRouter.patch(
 );
 
 
+
+
+
 // Fetch expenses for a date range (for analytics - reduces 30+ API calls to 1)
 expressRouter.get("/expenses/range", userAuth, async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user._id;
+    const userId = req.user!._id;
     const { startDate, endDate } = req.query;
 
     if (!startDate || !endDate) {
@@ -424,6 +452,75 @@ expressRouter.get("/expenses/range", userAuth, async (req: Request, res: Respons
   } catch (err) {
     logApiError(req, err, { route: "GET /expenses/range" });
     return res.status(500).json({ message: "Failed to load expenses" });
+  }
+});
+
+
+
+
+
+
+// Get transaction count per day for heatmap (like LeetCode/GitHub contribution graph)
+expressRouter.get("/expenses/heatmap/", userAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!._id;
+    const { year } = req.query;
+
+    // Default to current year if not provided
+    const targetYear = year ? parseInt(year as string) : new Date().getFullYear();
+    
+    const startDate = new Date(`${targetYear}-01-01T00:00:00.000Z`);
+    const endDate = new Date(`${targetYear}-12-31T23:59:59.999Z`);
+
+    // Aggregate to get count of transactions per day
+    const heatmapData: HeatmapAggregate[] = await Expense.aggregate([
+      {
+        $match: {
+          userId: new mongoose.Types.ObjectId(userId),
+          deleted: false,
+          occurredAt: {
+            $gte: startDate,
+            $lte: endDate,
+          },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: "%Y-%m-%d", date: "$occurredAt" },
+          },
+          count: { $sum: 1 },
+          totalAmount: { $sum: "$amount" },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          date: "$_id",
+          count: 1,
+          totalAmount: 1,
+        },
+      },
+      {
+        $sort: { date: 1 },
+      },
+    ]);
+
+    logEvent("info", "Heatmap data fetched", {
+      route: "GET /expenses/heatmap",
+      userId,
+      year: targetYear,
+      daysWithTransactions: heatmapData.length,
+    });
+
+    return res.json({
+      message: "Heatmap data fetched successfully",
+      data: heatmapData,
+      year: targetYear,
+    });
+  } catch (err) {
+    logApiError(req, err, { route: "GET /expenses/heatmap" });
+    return res.status(500).json({ message: "Failed to load heatmap data" });
   }
 });
 
