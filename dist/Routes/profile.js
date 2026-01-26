@@ -8,6 +8,7 @@ const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const UserSchema_1 = __importDefault(require("../Models/UserSchema"));
 const LoginHistorySchema_1 = __importDefault(require("../Models/LoginHistorySchema"));
+const ExpenseSchema_1 = __importDefault(require("../Models/ExpenseSchema"));
 const userAuth_1 = __importDefault(require("../Middlewares/userAuth"));
 const logger_1 = require("../utils/logger");
 const multer_1 = require("../config/multer");
@@ -34,6 +35,9 @@ profileRouter.get("/profile/view", userAuth_1.default, async (req, res, next) =>
         const profileWithDefaults = {
             ...profile,
             monthlyIncome: profile.monthlyIncome ?? 0,
+            dailyBudget: profile.dailyBudget ?? 0,
+            currentStreak: profile.currentStreak ?? 0,
+            longestStreak: profile.longestStreak ?? 0,
         };
         (0, logger_1.logEvent)("info", "Profile fetched", {
             route: "GET /profile/view",
@@ -57,7 +61,7 @@ profileRouter.patch("/profile/update", userAuth_1.default, async (req, res) => {
             return res.status(401).json({ message: "Not authenticated" });
         }
         const loggedInUserId = req.user._id;
-        const { name, statusMessage, currency, preferences, monthlyIncome } = req.body;
+        const { name, statusMessage, currency, preferences, monthlyIncome, dailyBudget } = req.body;
         // Build update object with only allowed fields
         const updateData = {};
         if (name !== undefined)
@@ -70,6 +74,8 @@ profileRouter.patch("/profile/update", userAuth_1.default, async (req, res) => {
             updateData.preferences = preferences;
         if (monthlyIncome !== undefined)
             updateData.monthlyIncome = monthlyIncome;
+        if (dailyBudget !== undefined)
+            updateData.dailyBudget = dailyBudget;
         if (Object.keys(updateData).length === 0) {
             return res.status(400).json({ message: "No valid fields to update" });
         }
@@ -86,6 +92,136 @@ profileRouter.patch("/profile/update", userAuth_1.default, async (req, res) => {
     }
     catch (err) {
         (0, logger_1.logApiError)(req, err, { route: "PATCH /profile/update" });
+        return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
+    }
+});
+/**
+ * GET /profile/streak
+ * - Requires userAuth middleware
+ * - Calculates and returns the user's budget streak
+ * - A streak day = spending <= dailyBudget (₹0 counts as under budget)
+ * - Day boundary is 12 PM to 12 PM (noon to noon)
+ *
+ * Optimized logic:
+ * - Streak update only happens ONCE per day (after 12 PM)
+ * - If already calculated today: return cached values (no DB write)
+ * - Otherwise: calculate, update DB, then return
+ */
+profileRouter.get("/profile/streak", userAuth_1.default, async (req, res) => {
+    try {
+        if (!req.user) {
+            return res.status(401).json({ message: "Not authenticated" });
+        }
+        const loggedInUserId = req.user._id;
+        // Get user's streak data
+        const user = await UserSchema_1.default.findById(loggedInUserId).select("dailyBudget currentStreak longestStreak lastStreakDate").lean();
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        const dailyBudget = user.dailyBudget || 0;
+        // If no daily budget is set, return zeros
+        if (dailyBudget <= 0) {
+            return res.status(200).json({
+                currentStreak: 0,
+                longestStreak: user.longestStreak || 0,
+                dailyBudget: 0,
+                todaySpent: 0,
+                todayUnderBudget: false,
+                message: "Set a daily budget to start tracking your streak",
+            });
+        }
+        // Get 12 PM boundary for current period
+        // A "day" is from 12:00 PM (noon) to next day 12:00 PM
+        const now = new Date();
+        const noon = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0, 0);
+        let currentPeriodStart;
+        let currentPeriodEnd;
+        if (now.getHours() < 12) {
+            // Before noon: day started at yesterday's noon
+            currentPeriodStart = new Date(noon);
+            currentPeriodStart.setDate(currentPeriodStart.getDate() - 1);
+            currentPeriodEnd = noon;
+        }
+        else {
+            // After noon: day started at today's noon
+            currentPeriodStart = noon;
+            currentPeriodEnd = new Date(noon);
+            currentPeriodEnd.setDate(currentPeriodEnd.getDate() + 1);
+        }
+        // Check if already calculated for today's period
+        const lastStreakDate = user.lastStreakDate ? new Date(user.lastStreakDate) : null;
+        const alreadyCalculatedToday = lastStreakDate &&
+            lastStreakDate.getTime() === currentPeriodStart.getTime();
+        // Get current period's total spending (always needed for display)
+        const todayExpenses = await ExpenseSchema_1.default.aggregate([
+            {
+                $match: {
+                    userId: loggedInUserId,
+                    deleted: { $ne: true },
+                    occurredAt: { $gte: currentPeriodStart, $lt: currentPeriodEnd },
+                },
+            },
+            {
+                $group: {
+                    _id: null,
+                    total: { $sum: "$amount" },
+                },
+            },
+        ]);
+        const todaySpent = todayExpenses[0]?.total || 0;
+        const todayUnderBudget = todaySpent <= dailyBudget;
+        // If already calculated today, just return cached values (no DB write)
+        if (alreadyCalculatedToday) {
+            return res.status(200).json({
+                currentStreak: user.currentStreak || 0,
+                longestStreak: user.longestStreak || 0,
+                dailyBudget,
+                todaySpent,
+                todayUnderBudget,
+                remainingToday: Math.max(0, dailyBudget - todaySpent),
+                periodStart: currentPeriodStart,
+                periodEnd: currentPeriodEnd,
+                cached: true, // Indicates this is cached data
+            });
+        }
+        // First time today - calculate and update streak
+        let currentStreak = user.currentStreak || 0;
+        if (todayUnderBudget) {
+            currentStreak++;
+        }
+        else {
+            currentStreak = 0;
+        }
+        // Update longest streak if current is higher
+        const longestStreak = Math.max(user.longestStreak || 0, currentStreak);
+        // Update user's streak data (only once per day)
+        await UserSchema_1.default.findByIdAndUpdate(loggedInUserId, {
+            $set: {
+                currentStreak,
+                longestStreak,
+                lastStreakDate: currentPeriodStart, // Mark today as calculated
+            },
+        });
+        (0, logger_1.logEvent)("info", "Streak calculated", {
+            route: "GET /profile/streak",
+            userId: loggedInUserId,
+            currentStreak,
+            longestStreak,
+        });
+        return res.status(200).json({
+            currentStreak,
+            longestStreak,
+            dailyBudget,
+            todaySpent,
+            todayUnderBudget,
+            remainingToday: Math.max(0, dailyBudget - todaySpent),
+            periodStart: currentPeriodStart,
+            periodEnd: currentPeriodEnd,
+            cached: false, // Fresh calculation
+        });
+    }
+    catch (err) {
+        (0, logger_1.logApiError)(req, err, { route: "GET /profile/streak" });
         return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
 });

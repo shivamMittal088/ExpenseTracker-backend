@@ -70,6 +70,25 @@ const UserSchema = new mongoose_1.Schema({
         default: 0,
         min: 0,
     },
+    dailyBudget: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+    currentStreak: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+    longestStreak: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+    lastStreakDate: {
+        type: Date,
+        default: null,
+    },
     preferences: {
         darkMode: {
             type: Boolean,

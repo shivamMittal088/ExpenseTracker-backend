@@ -15,6 +15,10 @@ export interface IUser extends Document {
   statusMessage?: string;
   currency: "INR" | "USD" | "EUR";
   monthlyIncome: number;
+  dailyBudget: number;
+  currentStreak: number;
+  longestStreak: number;
+  lastStreakDate: Date | null;
   preferences: UserPreferences;
   createdAt: Date;
   updatedAt: Date;
@@ -62,6 +66,29 @@ const UserSchema = new Schema<IUser>(
       type: Number,
       default: 0,
       min: 0,
+    },
+
+    dailyBudget: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    currentStreak: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    longestStreak: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    lastStreakDate: {
+      type: Date,
+      default: null,
     },
 
     preferences: {

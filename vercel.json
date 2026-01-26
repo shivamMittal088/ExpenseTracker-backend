@@ -15,5 +15,11 @@
       }
     },
     { "src": "/test", "dest": "/api/index.ts" }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/update-streaks",
+      "schedule": "0 12 * * *"
+    }
   ]
 }

@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import app from "./app";
 import { connectDB } from "../config/database";
 import { sendLog } from "../config/axiomClient";
+import { startStreakCron } from "../cron/streakCron";
 
 dotenv.config();
 
@@ -13,6 +14,10 @@ const server = http.createServer(app);
 connectDB()
   .then(() => {
     console.log("Database connected successfully");
+    
+    // Start cron jobs
+    startStreakCron();
+    
     void sendLog({
       type: "app_start",
       message: "Backend server started",

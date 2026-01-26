@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import User from "../Models/UserSchema";
 import LoginHistory from "../Models/LoginHistorySchema";
+import Expense from "../Models/ExpenseSchema";
 import userAuth from "../Middlewares/userAuth";
 import { IUser } from "../Models/UserSchema";
 import { logApiError, logEvent } from "../utils/logger";
@@ -47,6 +48,9 @@ profileRouter.get(
       const profileWithDefaults = {
         ...profile,
         monthlyIncome: profile.monthlyIncome ?? 0,
+        dailyBudget: profile.dailyBudget ?? 0,
+        currentStreak: profile.currentStreak ?? 0,
+        longestStreak: profile.longestStreak ?? 0,
       };
 
       logEvent("info", "Profile fetched", {
@@ -77,7 +81,7 @@ profileRouter.patch(
       }
 
       const loggedInUserId = req.user._id;
-      const { name, statusMessage, currency, preferences, monthlyIncome } = req.body;
+      const { name, statusMessage, currency, preferences, monthlyIncome, dailyBudget } = req.body;
 
       // Build update object with only allowed fields
       const updateData: Record<string, unknown> = {};
@@ -86,6 +90,7 @@ profileRouter.patch(
       if (currency !== undefined) updateData.currency = currency;
       if (preferences !== undefined) updateData.preferences = preferences;
       if (monthlyIncome !== undefined) updateData.monthlyIncome = monthlyIncome;
+      if (dailyBudget !== undefined) updateData.dailyBudget = dailyBudget;
 
       if (Object.keys(updateData).length === 0) {
         return res.status(400).json({ message: "No valid fields to update" });
@@ -110,6 +115,92 @@ profileRouter.patch(
       return res.status(200).json(updatedProfile);
     } catch (err: any) {
       logApiError(req, err, { route: "PATCH /profile/update" });
+      return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
+    }
+  }
+);
+
+/**
+ * GET /profile/streak
+ * - Requires userAuth middleware
+ * - Returns user's streak data from DB (read-only)
+ * - Streak updates are handled by cron job at 12 PM daily
+ * - Only fetches today's spending for real-time display
+ */
+profileRouter.get(
+  "/profile/streak",
+  userAuth,
+  async (req: Request, res: Response) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const loggedInUserId = req.user._id;
+      
+      // Get user's streak data from DB
+      const user = await User.findById(loggedInUserId)
+        .select("dailyBudget currentStreak longestStreak")
+        .lean();
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const dailyBudget = user.dailyBudget || 0;
+      
+      // If no daily budget is set, return zeros
+      if (dailyBudget <= 0) {
+        return res.status(200).json({
+          currentStreak: 0,
+          longestStreak: user.longestStreak || 0,
+          dailyBudget: 0,
+          todaySpent: 0,
+          todayUnderBudget: false,
+          remainingToday: 0,
+        });
+      }
+
+      // Get current 12 PM period for today's spending
+      const now = new Date();
+      const noon = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0, 0);
+      
+      const currentPeriodStart = now.getHours() < 12
+        ? new Date(noon.getTime() - 24 * 60 * 60 * 1000) // Yesterday noon
+        : noon; // Today noon
+      
+      const currentPeriodEnd = new Date(currentPeriodStart.getTime() + 24 * 60 * 60 * 1000);
+
+      // Get today's spending (real-time)
+      const todayExpenses = await Expense.aggregate([
+        {
+          $match: {
+            userId: loggedInUserId,
+            deleted: { $ne: true },
+            occurredAt: { $gte: currentPeriodStart, $lt: currentPeriodEnd },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: "$amount" },
+          },
+        },
+      ]);
+
+      const todaySpent = todayExpenses[0]?.total || 0;
+      const todayUnderBudget = todaySpent <= dailyBudget;
+
+      return res.status(200).json({
+        currentStreak: user.currentStreak || 0,
+        longestStreak: user.longestStreak || 0,
+        dailyBudget,
+        todaySpent,
+        todayUnderBudget,
+        remainingToday: Math.max(0, dailyBudget - todaySpent),
+      });
+    } catch (err: any) {
+      logApiError(req, err, { route: "GET /profile/streak" });
       return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
   }

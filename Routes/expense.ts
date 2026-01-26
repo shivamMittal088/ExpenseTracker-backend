@@ -469,15 +469,21 @@ expressRouter.get("/expenses/heatmap/", userAuth, async (req: Request, res: Resp
     // Default to current year if not provided
     const targetYear = year ? parseInt(year as string) : new Date().getFullYear();
     
-    const startDate = new Date(`${targetYear}-01-01T00:00:00.000Z`);
-    const endDate = new Date(`${targetYear}-12-31T23:59:59.999Z`);
+    // Use IST timezone for date boundaries (UTC+5:30)
+    // IST midnight = UTC 18:30 previous day
+    const IST_OFFSET_HOURS = 5.5;
+    
+    // Start of year in IST (Jan 1 00:00 IST = Dec 31 18:30 UTC previous year)
+    const startDate = new Date(Date.UTC(targetYear - 1, 11, 31, 18, 30, 0, 0));
+    // End of year in IST (Dec 31 23:59:59 IST = Dec 31 18:29:59 UTC)
+    const endDate = new Date(Date.UTC(targetYear, 11, 31, 18, 29, 59, 999));
 
     // Aggregate to get count of transactions per day
     const heatmapData: HeatmapAggregate[] = await Expense.aggregate([
       {
         $match: {
           userId: new mongoose.Types.ObjectId(userId),
-          deleted: false,
+          deleted: { $ne: true },
           occurredAt: {
             $gte: startDate,
             $lte: endDate,
@@ -487,7 +493,12 @@ expressRouter.get("/expenses/heatmap/", userAuth, async (req: Request, res: Resp
       {
         $group: {
           _id: {
-            $dateToString: { format: "%Y-%m-%d", date: "$occurredAt" },
+            // Convert to IST by adding 5:30 hours, then format as date
+            $dateToString: { 
+              format: "%Y-%m-%d", 
+              date: "$occurredAt",
+              timezone: "+05:30"  // IST timezone
+            },
           },
           count: { $sum: 1 },
           totalAmount: { $sum: "$amount" },
