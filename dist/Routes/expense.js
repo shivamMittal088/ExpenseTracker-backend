@@ -626,6 +626,151 @@ expressRouter.get("/expenses/payment-breakdown", userAuth_1.default, async (req,
         return res.status(500).json({ message: "Failed to fetch payment breakdown" });
     }
 });
+// Get spending trends for graphs (daily, monthly, yearly views)
+expressRouter.get("/expenses/spending-trends", userAuth_1.default, async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const { view = "daily" } = req.query; // daily, monthly, yearly
+        const now = new Date();
+        let startDate;
+        let groupFormat;
+        let timezone = "+05:30"; // IST
+        // Configure based on view type
+        switch (view) {
+            case "daily":
+                // Last 30 days
+                startDate = new Date(now);
+                startDate.setDate(now.getDate() - 30);
+                groupFormat = "%Y-%m-%d";
+                break;
+            case "monthly":
+                // Last 12 months
+                startDate = new Date(now);
+                startDate.setMonth(now.getMonth() - 12);
+                groupFormat = "%Y-%m";
+                break;
+            case "yearly":
+                // Last 5 years
+                startDate = new Date(now);
+                startDate.setFullYear(now.getFullYear() - 5);
+                groupFormat = "%Y";
+                break;
+            default:
+                startDate = new Date(now);
+                startDate.setDate(now.getDate() - 30);
+                groupFormat = "%Y-%m-%d";
+        }
+        // Aggregate spending by period
+        const trends = await ExpenseSchema_1.default.aggregate([
+            {
+                $match: {
+                    userId: new mongoose_1.default.Types.ObjectId(userId),
+                    deleted: { $ne: true },
+                    occurredAt: { $gte: startDate },
+                },
+            },
+            {
+                $group: {
+                    _id: {
+                        $dateToString: {
+                            format: groupFormat,
+                            date: "$occurredAt",
+                            timezone: timezone,
+                        },
+                    },
+                    totalAmount: { $sum: "$amount" },
+                    count: { $sum: 1 },
+                    avgAmount: { $avg: "$amount" },
+                    maxAmount: { $max: "$amount" },
+                },
+            },
+            {
+                $sort: { _id: 1 },
+            },
+            {
+                $project: {
+                    _id: 0,
+                    period: "$_id",
+                    totalAmount: { $round: ["$totalAmount", 0] },
+                    count: 1,
+                    avgAmount: { $round: ["$avgAmount", 0] },
+                    maxAmount: { $round: ["$maxAmount", 0] },
+                },
+            },
+        ]);
+        // Fill in missing periods with zero values
+        const filledTrends = [];
+        const periodSet = new Set(trends.map(t => t.period));
+        if (view === "daily") {
+            // Fill last 30 days
+            for (let i = 29; i >= 0; i--) {
+                const date = new Date(now);
+                date.setDate(now.getDate() - i);
+                const period = date.toISOString().split("T")[0];
+                const existing = trends.find(t => t.period === period);
+                filledTrends.push(existing || { period, totalAmount: 0, count: 0, avgAmount: 0, maxAmount: 0 });
+            }
+        }
+        else if (view === "monthly") {
+            // Fill last 12 months
+            for (let i = 11; i >= 0; i--) {
+                const date = new Date(now);
+                date.setMonth(now.getMonth() - i);
+                const period = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+                const existing = trends.find(t => t.period === period);
+                filledTrends.push(existing || { period, totalAmount: 0, count: 0, avgAmount: 0, maxAmount: 0 });
+            }
+        }
+        else if (view === "yearly") {
+            // Fill last 5 years
+            for (let i = 4; i >= 0; i--) {
+                const year = now.getFullYear() - i;
+                const period = String(year);
+                const existing = trends.find(t => t.period === period);
+                filledTrends.push(existing || { period, totalAmount: 0, count: 0, avgAmount: 0, maxAmount: 0 });
+            }
+        }
+        // Calculate summary stats
+        const totalSpent = filledTrends.reduce((sum, t) => sum + t.totalAmount, 0);
+        const totalTransactions = filledTrends.reduce((sum, t) => sum + t.count, 0);
+        const avgPerPeriod = filledTrends.length > 0 ? Math.round(totalSpent / filledTrends.length) : 0;
+        const maxPeriod = filledTrends.reduce((max, t) => t.totalAmount > max.totalAmount ? t : max, filledTrends[0]);
+        const minPeriod = filledTrends.filter(t => t.totalAmount > 0).reduce((min, t) => t.totalAmount < min.totalAmount ? t : min, filledTrends.find(t => t.totalAmount > 0) || filledTrends[0]);
+        // Calculate trend (comparing last period to average)
+        const lastPeriod = filledTrends[filledTrends.length - 1];
+        const previousPeriods = filledTrends.slice(0, -1);
+        const previousAvg = previousPeriods.length > 0
+            ? previousPeriods.reduce((sum, t) => sum + t.totalAmount, 0) / previousPeriods.length
+            : 0;
+        const trendPercentage = previousAvg > 0
+            ? Math.round(((lastPeriod.totalAmount - previousAvg) / previousAvg) * 100)
+            : 0;
+        (0, logger_1.logEvent)("info", "Spending trends fetched", {
+            route: "GET /expenses/spending-trends",
+            userId,
+            view,
+            periodsReturned: filledTrends.length,
+        });
+        return res.json({
+            message: "Spending trends fetched successfully",
+            data: filledTrends,
+            summary: {
+                view,
+                totalSpent,
+                totalTransactions,
+                avgPerPeriod,
+                highestPeriod: maxPeriod,
+                lowestPeriod: minPeriod,
+                trendPercentage,
+                trendDirection: trendPercentage > 0 ? "up" : trendPercentage < 0 ? "down" : "flat",
+            },
+        });
+    }
+    catch (err) {
+        (0, logger_1.logApiError)(req, err, { route: "GET /expenses/spending-trends" });
+        return res.status(500).json({ message: "Failed to fetch spending trends" });
+    }
+});
 // Get transaction count per day for heatmap (like LeetCode/GitHub contribution graph)
 expressRouter.get("/expenses/heatmap/", userAuth_1.default, async (req, res) => {
     try {
