@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express = require("express");
 const seedRouter = express.Router();
 const TilesSchema_1 = __importDefault(require("../Models/TilesSchema"));
+const ExpenseSchema_1 = __importDefault(require("../Models/ExpenseSchema"));
 const userAuth_1 = __importDefault(require("../Middlewares/userAuth"));
 const logger_1 = require("../utils/logger");
 seedRouter.post("/seed/tiles", userAuth_1.default, async (req, res) => {
@@ -40,6 +41,147 @@ seedRouter.post("/seed/tiles", userAuth_1.default, async (req, res) => {
     catch (err) {
         (0, logger_1.logApiError)(req, err, { route: "POST /seed/tiles" });
         res.status(500).json({ message: "Failed to seed tiles" });
+    }
+});
+// Seed test recurring expenses for testing the recurring payment detection
+seedRouter.post("/seed/recurring-expenses", userAuth_1.default, async (req, res) => {
+    try {
+        const userId = req.user?._id;
+        // Sample recurring expenses with realistic patterns
+        const recurringPatterns = [
+            {
+                name: "Netflix",
+                emoji: "🎬",
+                color: "#E50914",
+                amount: 649,
+                frequency: "monthly",
+                payment_mode: "card",
+            },
+            {
+                name: "Spotify",
+                emoji: "🎵",
+                color: "#1DB954",
+                amount: 119,
+                frequency: "monthly",
+                payment_mode: "UPI",
+            },
+            {
+                name: "Gym",
+                emoji: "💪",
+                color: "#F59E0B",
+                amount: 1500,
+                frequency: "monthly",
+                payment_mode: "UPI",
+            },
+            {
+                name: "Internet",
+                emoji: "🌐",
+                color: "#8B5CF6",
+                amount: 899,
+                frequency: "monthly",
+                payment_mode: "card",
+            },
+            {
+                name: "Mobile Recharge",
+                emoji: "📱",
+                color: "#3B82F6",
+                amount: 299,
+                frequency: "monthly",
+                payment_mode: "UPI",
+            },
+            {
+                name: "Groceries",
+                emoji: "🛒",
+                color: "#22C55E",
+                amount: 2500,
+                frequency: "weekly",
+                payment_mode: "UPI",
+                amountVariance: 500, // Add some variance to make it realistic
+            },
+            {
+                name: "Coffee",
+                emoji: "☕",
+                color: "#78350F",
+                amount: 180,
+                frequency: "weekly",
+                payment_mode: "UPI",
+                amountVariance: 50,
+            },
+        ];
+        const expenses = [];
+        const now = new Date();
+        for (const pattern of recurringPatterns) {
+            // Generate expenses for the last 4-6 months based on frequency
+            const monthsBack = pattern.frequency === "weekly" ? 3 : 5;
+            for (let i = 0; i < monthsBack; i++) {
+                const date = new Date(now);
+                if (pattern.frequency === "monthly") {
+                    date.setMonth(date.getMonth() - i);
+                    date.setDate(Math.min(date.getDate(), 28)); // Avoid month-end issues
+                }
+                else if (pattern.frequency === "weekly") {
+                    date.setDate(date.getDate() - (i * 7));
+                }
+                // Add small random variance to amount if specified
+                const variance = pattern.amountVariance || 0;
+                const amount = pattern.amount + Math.floor(Math.random() * variance * 2) - variance;
+                expenses.push({
+                    userId,
+                    amount: Math.max(amount, 10),
+                    category: {
+                        name: pattern.name,
+                        emoji: pattern.emoji,
+                        color: pattern.color,
+                    },
+                    payment_mode: pattern.payment_mode,
+                    occurredAt: date,
+                    notes: `Test recurring - ${pattern.name}`,
+                    deleted: false,
+                });
+            }
+        }
+        // Insert all test expenses
+        const created = await ExpenseSchema_1.default.insertMany(expenses);
+        (0, logger_1.logEvent)("info", "Recurring test expenses seeded", {
+            route: "POST /seed/recurring-expenses",
+            userId,
+            count: created.length,
+        });
+        return res.status(201).json({
+            message: `Created ${created.length} test recurring expenses`,
+            summary: recurringPatterns.map(p => ({
+                name: p.name,
+                frequency: p.frequency,
+                amount: p.amount,
+            })),
+        });
+    }
+    catch (err) {
+        (0, logger_1.logApiError)(req, err, { route: "POST /seed/recurring-expenses" });
+        return res.status(500).json({ message: "Failed to seed recurring expenses" });
+    }
+});
+// Delete all test recurring expenses (cleanup)
+seedRouter.delete("/seed/recurring-expenses", userAuth_1.default, async (req, res) => {
+    try {
+        const userId = req.user?._id;
+        // Delete only test expenses (those with "Test recurring" in notes)
+        const result = await ExpenseSchema_1.default.deleteMany({
+            userId,
+            notes: { $regex: /^Test recurring/i },
+        });
+        (0, logger_1.logEvent)("info", "Test recurring expenses deleted", {
+            route: "DELETE /seed/recurring-expenses",
+            userId,
+            deletedCount: result.deletedCount,
+        });
+        return res.json({
+            message: `Deleted ${result.deletedCount} test expenses`,
+        });
+    }
+    catch (err) {
+        (0, logger_1.logApiError)(req, err, { route: "DELETE /seed/recurring-expenses" });
+        return res.status(500).json({ message: "Failed to delete test expenses" });
     }
 });
 exports.default = seedRouter;

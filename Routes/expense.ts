@@ -43,6 +43,36 @@ interface HeatmapAggregate {
   totalAmount: number;
 }
 
+// Interface for recurring payment aggregation result
+interface RecurringAggregate {
+  name: string;
+  category: Category;
+  count: number;
+  avgAmount: number;
+  minAmount: number;
+  maxAmount: number;
+  totalAmount: number;
+  lastOccurrence: Date;
+  firstOccurrence: Date;
+  dates: Date[];
+}
+
+// Interface for processed recurring payment
+interface RecurringPayment {
+  name: string;
+  emoji: string;
+  color: string;
+  amount: number;
+  count: number;
+  frequency: "daily" | "weekly" | "bi-weekly" | "monthly" | "quarterly" | "irregular";
+  frequencyLabel: string;           // Human readable: "Every 30 days"
+  nextExpectedDate: string | null;  // When the next payment is likely
+  estimatedMonthlyAmount: number;
+  lastOccurrence: Date;
+  confidenceScore: number;
+  isLikelyRecurring: boolean;
+}
+
 const parseBool = (value: unknown): boolean =>
   value === true || value === "true" || value === "1" || value === 1;
 
@@ -456,6 +486,322 @@ expressRouter.get("/expenses/range", userAuth, async (req: Request, res: Respons
 });
 
 
+
+
+
+// Detect recurring payments based on expense patterns
+expressRouter.get("/expenses/recurring", userAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!._id;
+    const debug = req.query.debug === "true"; // Add ?debug=true for detailed output
+    
+    // Look back 6 months for pattern detection
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+    // Aggregate expenses by category name and similar amounts (within 10% tolerance)
+    const recurringData = await Expense.aggregate([
+      {
+        $match: {
+          userId: new mongoose.Types.ObjectId(userId),
+          deleted: { $ne: true },
+          occurredAt: { $gte: sixMonthsAgo },
+        },
+      },
+
+      // these are the accumulators of the aggregation pipeline, they are used to group the expenses by category name and similar amounts, and to calculate various statistics for each group .
+      {
+        // Group by category name to find repeated expenses
+        $group: {
+          _id: "$category.name",  // Group only by category name
+          category: { $first: "$category" },
+          amounts: { $push: "$amount" },
+          dates: { $push: "$occurredAt" },
+          count: { $sum: 1 },
+          totalAmount: { $sum: "$amount" },
+          avgAmount: { $avg: "$amount" },
+          minAmount: { $min: "$amount" },
+          maxAmount: { $max: "$amount" },
+          lastOccurrence: { $max: "$occurredAt" },
+          firstOccurrence: { $min: "$occurredAt" },
+        },
+      },
+
+      {
+        // Filter to only include expenses that occur at least 3 times
+        $match: {
+          count: { $gte: 3 },
+        },
+      },
+
+      {
+        $project: {
+          _id: 0,
+          name: "$_id",  // Now _id is just the category name string
+          category: 1,
+          count: 1,
+          avgAmount: { $round: ["$avgAmount", 0] },
+          minAmount: 1,
+          maxAmount: 1,
+          totalAmount: 1,
+          lastOccurrence: 1,
+          firstOccurrence: 1,
+          dates: 1,
+        },
+      },
+
+      {
+        $sort: { count: -1, avgAmount: -1 },
+      },
+
+      {
+        $limit: 12,
+      },
+    ]) as RecurringAggregate[];
+
+    // Calculate frequency (monthly, weekly, etc.) for each recurring expense
+    const recurringWithFrequency: RecurringPayment[] = recurringData.map((item: RecurringAggregate) => {
+      const dates = item.dates.map((d: Date) => new Date(d).getTime()).sort((a: number, b: number) => a - b);
+      
+      // Calculate average days between occurrences
+      let totalDaysBetween = 0;
+      for (let i = 1; i < dates.length; i++) {
+        totalDaysBetween += (dates[i] - dates[i - 1]) / (1000 * 60 * 60 * 24);
+      }
+      const avgDaysBetween = dates.length > 1 ? totalDaysBetween / (dates.length - 1) : 30;
+
+      // Determine frequency type and human-readable label
+      let frequency: "daily" | "weekly" | "bi-weekly" | "monthly" | "quarterly" | "irregular";
+      let frequencyLabel: string;
+      let estimatedMonthlyAmount: number;
+
+      if (avgDaysBetween <= 3) {
+        frequency = "daily";
+        frequencyLabel = "Every day";
+        estimatedMonthlyAmount = item.avgAmount * 30;
+      } else if (avgDaysBetween <= 10) {
+        frequency = "weekly";
+        frequencyLabel = "Every week";
+        estimatedMonthlyAmount = item.avgAmount * 4;
+      } else if (avgDaysBetween <= 20) {
+        frequency = "bi-weekly";
+        frequencyLabel = "Every 2 weeks";
+        estimatedMonthlyAmount = item.avgAmount * 2;
+      } else if (avgDaysBetween <= 45) {
+        frequency = "monthly";
+        frequencyLabel = "Every month";
+        estimatedMonthlyAmount = item.avgAmount;
+      } else if (avgDaysBetween <= 100) {
+        frequency = "quarterly";
+        frequencyLabel = "Every 3 months";
+        estimatedMonthlyAmount = Math.round(item.avgAmount / 3);
+      } else {
+        frequency = "irregular";
+        frequencyLabel = `Every ~${Math.round(avgDaysBetween)} days`;
+        estimatedMonthlyAmount = Math.round(item.avgAmount / (avgDaysBetween / 30));
+      }
+
+      // Calculate next expected date based on last occurrence and average interval
+      const lastDate = new Date(item.lastOccurrence);
+      const nextDate = new Date(lastDate.getTime() + avgDaysBetween * 24 * 60 * 60 * 1000);
+      const today = new Date();
+      
+      // Format next expected date
+      let nextExpectedDate: string | null = null;
+      const daysUntilNext = Math.ceil((nextDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (daysUntilNext < 0) {
+        // Overdue
+        nextExpectedDate = `Overdue by ${Math.abs(daysUntilNext)} days`;
+      } else if (daysUntilNext === 0) {
+        nextExpectedDate = "Due today";
+      } else if (daysUntilNext === 1) {
+        nextExpectedDate = "Due tomorrow";
+      } else if (daysUntilNext <= 7) {
+        nextExpectedDate = `In ${daysUntilNext} days`;
+      } else {
+        nextExpectedDate = nextDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+      }
+
+      // Calculate confidence score (higher count + consistent amounts = higher confidence)
+      const amountVariance = item.maxAmount - item.minAmount;
+      const amountConsistency = item.avgAmount > 0 ? 1 - (amountVariance / item.avgAmount) : 0;
+      const confidenceScore = Math.min(100, Math.round(
+        (Math.min(item.count, 6) / 6) * 50 + // Max 50 points for frequency
+        Math.max(0, amountConsistency) * 50   // Max 50 points for amount consistency
+      ));
+
+      return {
+        name: item.name,
+        emoji: item.category?.emoji || "💳",
+        color: item.category?.color || "#10b981",
+        amount: item.avgAmount,
+        count: item.count,
+        frequency,
+        frequencyLabel,
+        nextExpectedDate,
+        estimatedMonthlyAmount,
+        lastOccurrence: item.lastOccurrence,
+        confidenceScore,
+        isLikelyRecurring: confidenceScore >= 40 && item.count >= 2,
+      };
+    });
+
+    // Filter to only include likely recurring payments
+    const likelyRecurring = recurringWithFrequency.filter(item => item.isLikelyRecurring);
+
+    // Calculate totals
+    const totalMonthlyRecurring = likelyRecurring.reduce((sum, item) => sum + item.estimatedMonthlyAmount, 0);
+
+    logEvent("info", "Recurring payments fetched", {
+      route: "GET /expenses/recurring",
+      userId,
+      recurringCount: likelyRecurring.length,
+      totalMonthlyRecurring,
+    });
+
+    return res.json({
+      message: "Recurring payments detected successfully",
+      data: likelyRecurring,
+      summary: {
+        count: likelyRecurring.length,
+        totalMonthlyEstimate: totalMonthlyRecurring,
+      },
+      // Include debug info if requested
+      ...(debug && {
+        debug: {
+          analyzedPeriod: {
+            from: sixMonthsAgo.toISOString(),
+            to: new Date().toISOString(),
+          },
+          rawGroupsFound: recurringData.length,
+          allProcessed: recurringWithFrequency.map(item => ({
+            name: item.name,
+            count: item.count,
+            frequency: item.frequency,
+            frequencyLabel: item.frequencyLabel,
+            nextExpectedDate: item.nextExpectedDate,
+            confidenceScore: item.confidenceScore,
+            isLikelyRecurring: item.isLikelyRecurring,
+            reason: item.confidenceScore < 40 ? "Low confidence score" : item.count < 2 ? "Too few occurrences" : "Passed",
+          })),
+        },
+      }),
+    });
+  } catch (err) {
+    logApiError(req, err, { route: "GET /expenses/recurring" });
+    return res.status(500).json({ message: "Failed to detect recurring payments" });
+  }
+});
+
+
+
+
+// Get payment mode breakdown (pie chart data)
+expressRouter.get("/expenses/payment-breakdown", userAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!._id;
+    const { period = "month" } = req.query; // week, month, 3month, 6month, year
+
+    // Calculate date range based on period
+    const now = new Date();
+    let startDate: Date;
+
+    switch (period) {
+      case "week":
+        startDate = new Date(now);
+        startDate.setDate(now.getDate() - 7);
+        break;
+      case "month":
+        startDate = new Date(now);
+        startDate.setMonth(now.getMonth() - 1);
+        break;
+      case "3month":
+        startDate = new Date(now);
+        startDate.setMonth(now.getMonth() - 3);
+        break;
+      case "6month":
+        startDate = new Date(now);
+        startDate.setMonth(now.getMonth() - 6);
+        break;
+      case "year":
+      default:
+        startDate = new Date(now);
+        startDate.setFullYear(now.getFullYear() - 1);
+        break;
+    }
+
+    // Aggregate by payment mode
+    const breakdown = await Expense.aggregate([
+      {
+        $match: {
+          userId: new mongoose.Types.ObjectId(userId),
+          deleted: { $ne: true },
+          ...(period !== "all" && { occurredAt: { $gte: startDate } }),
+        },
+      },
+      {
+        $group: {
+          _id: "$payment_mode",
+          totalAmount: { $sum: "$amount" },
+          count: { $sum: 1 },
+          avgAmount: { $avg: "$amount" },
+        },
+      },
+      {
+        $sort: { totalAmount: -1 },
+      },
+    ]) as { _id: string; totalAmount: number; count: number; avgAmount: number }[];
+
+    // Calculate totals and percentages
+    const grandTotal = breakdown.reduce((sum: number, item) => sum + item.totalAmount, 0);
+    const totalTransactions = breakdown.reduce((sum: number, item) => sum + item.count, 0);
+
+    // Payment mode display info
+    const paymentModeInfo: Record<string, { label: string; color: string; icon: string }> = {
+      UPI: { label: "UPI", color: "#8B5CF6", icon: "📱" },
+      cash: { label: "Cash", color: "#10B981", icon: "💵" },
+      card: { label: "Card", color: "#3B82F6", icon: "💳" },
+      bank_transfer: { label: "Bank Transfer", color: "#F59E0B", icon: "🏦" },
+      wallet: { label: "Wallet", color: "#EC4899", icon: "👛" },
+    };
+
+    const data = breakdown.map((item) => {
+      const info = paymentModeInfo[item._id] || { label: item._id, color: "#6B7280", icon: "💰" };
+      return {
+        mode: item._id,
+        label: info.label,
+        color: info.color,
+        icon: info.icon,
+        totalAmount: Math.round(item.totalAmount),
+        count: item.count,
+        avgAmount: Math.round(item.avgAmount),
+        percentage: grandTotal > 0 ? Math.round((item.totalAmount / grandTotal) * 100) : 0,
+      };
+    });
+
+    logEvent("info", "Payment breakdown fetched", {
+      route: "GET /expenses/payment-breakdown",
+      userId,
+      period,
+      modesFound: data.length,
+    });
+
+    return res.json({
+      message: "Payment breakdown fetched successfully",
+      data,
+      summary: {
+        totalAmount: grandTotal,
+        totalTransactions,
+        period,
+        topMode: data[0]?.label || null,
+      },
+    });
+  } catch (err) {
+    logApiError(req, err, { route: "GET /expenses/payment-breakdown" });
+    return res.status(500).json({ message: "Failed to fetch payment breakdown" });
+  }
+});
 
 
 

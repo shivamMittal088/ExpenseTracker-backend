@@ -98,14 +98,9 @@ profileRouter.patch("/profile/update", userAuth_1.default, async (req, res) => {
 /**
  * GET /profile/streak
  * - Requires userAuth middleware
- * - Calculates and returns the user's budget streak
- * - A streak day = spending <= dailyBudget (₹0 counts as under budget)
- * - Day boundary is 12 PM to 12 PM (noon to noon)
- *
- * Optimized logic:
- * - Streak update only happens ONCE per day (after 12 PM)
- * - If already calculated today: return cached values (no DB write)
- * - Otherwise: calculate, update DB, then return
+ * - Returns user's streak data from DB (read-only)
+ * - Streak updates are handled by cron job at 12 PM daily
+ * - Only fetches today's spending for real-time display
  */
 profileRouter.get("/profile/streak", userAuth_1.default, async (req, res) => {
     try {
@@ -113,8 +108,10 @@ profileRouter.get("/profile/streak", userAuth_1.default, async (req, res) => {
             return res.status(401).json({ message: "Not authenticated" });
         }
         const loggedInUserId = req.user._id;
-        // Get user's streak data
-        const user = await UserSchema_1.default.findById(loggedInUserId).select("dailyBudget currentStreak longestStreak lastStreakDate").lean();
+        // Get user's streak data from DB
+        const user = await UserSchema_1.default.findById(loggedInUserId)
+            .select("dailyBudget currentStreak longestStreak")
+            .lean();
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
@@ -127,32 +124,17 @@ profileRouter.get("/profile/streak", userAuth_1.default, async (req, res) => {
                 dailyBudget: 0,
                 todaySpent: 0,
                 todayUnderBudget: false,
-                message: "Set a daily budget to start tracking your streak",
+                remainingToday: 0,
             });
         }
-        // Get 12 PM boundary for current period
-        // A "day" is from 12:00 PM (noon) to next day 12:00 PM
+        // Get current 12 PM period for today's spending
         const now = new Date();
         const noon = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0, 0);
-        let currentPeriodStart;
-        let currentPeriodEnd;
-        if (now.getHours() < 12) {
-            // Before noon: day started at yesterday's noon
-            currentPeriodStart = new Date(noon);
-            currentPeriodStart.setDate(currentPeriodStart.getDate() - 1);
-            currentPeriodEnd = noon;
-        }
-        else {
-            // After noon: day started at today's noon
-            currentPeriodStart = noon;
-            currentPeriodEnd = new Date(noon);
-            currentPeriodEnd.setDate(currentPeriodEnd.getDate() + 1);
-        }
-        // Check if already calculated for today's period
-        const lastStreakDate = user.lastStreakDate ? new Date(user.lastStreakDate) : null;
-        const alreadyCalculatedToday = lastStreakDate &&
-            lastStreakDate.getTime() === currentPeriodStart.getTime();
-        // Get current period's total spending (always needed for display)
+        const currentPeriodStart = now.getHours() < 12
+            ? new Date(noon.getTime() - 24 * 60 * 60 * 1000) // Yesterday noon
+            : noon; // Today noon
+        const currentPeriodEnd = new Date(currentPeriodStart.getTime() + 24 * 60 * 60 * 1000);
+        // Get today's spending (real-time)
         const todayExpenses = await ExpenseSchema_1.default.aggregate([
             {
                 $match: {
@@ -170,54 +152,13 @@ profileRouter.get("/profile/streak", userAuth_1.default, async (req, res) => {
         ]);
         const todaySpent = todayExpenses[0]?.total || 0;
         const todayUnderBudget = todaySpent <= dailyBudget;
-        // If already calculated today, just return cached values (no DB write)
-        if (alreadyCalculatedToday) {
-            return res.status(200).json({
-                currentStreak: user.currentStreak || 0,
-                longestStreak: user.longestStreak || 0,
-                dailyBudget,
-                todaySpent,
-                todayUnderBudget,
-                remainingToday: Math.max(0, dailyBudget - todaySpent),
-                periodStart: currentPeriodStart,
-                periodEnd: currentPeriodEnd,
-                cached: true, // Indicates this is cached data
-            });
-        }
-        // First time today - calculate and update streak
-        let currentStreak = user.currentStreak || 0;
-        if (todayUnderBudget) {
-            currentStreak++;
-        }
-        else {
-            currentStreak = 0;
-        }
-        // Update longest streak if current is higher
-        const longestStreak = Math.max(user.longestStreak || 0, currentStreak);
-        // Update user's streak data (only once per day)
-        await UserSchema_1.default.findByIdAndUpdate(loggedInUserId, {
-            $set: {
-                currentStreak,
-                longestStreak,
-                lastStreakDate: currentPeriodStart, // Mark today as calculated
-            },
-        });
-        (0, logger_1.logEvent)("info", "Streak calculated", {
-            route: "GET /profile/streak",
-            userId: loggedInUserId,
-            currentStreak,
-            longestStreak,
-        });
         return res.status(200).json({
-            currentStreak,
-            longestStreak,
+            currentStreak: user.currentStreak || 0,
+            longestStreak: user.longestStreak || 0,
             dailyBudget,
             todaySpent,
             todayUnderBudget,
             remainingToday: Math.max(0, dailyBudget - todaySpent),
-            periodStart: currentPeriodStart,
-            periodEnd: currentPeriodEnd,
-            cached: false, // Fresh calculation
         });
     }
     catch (err) {
