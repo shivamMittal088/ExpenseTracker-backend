@@ -427,6 +427,51 @@ profileRouter.get(
 );
 
 /**
+ * GET /profile/follow-requests
+ * - Requires userAuth
+ * - Returns pending follow requests for the logged-in user
+ */
+profileRouter.get(
+  "/profile/follow-requests",
+  userAuth,
+  async (req: Request, res: Response) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const requests = await Follow.find({
+        followingId: req.user._id,
+        status: "pending",
+      })
+        .sort({ createdAt: -1 })
+        .populate("followerId", "name emailId photoURL statusMessage")
+        .lean();
+
+      const results = requests.map((request) => ({
+        id: String(request._id),
+        note: request.note,
+        createdAt: request.createdAt,
+        follower: request.followerId
+          ? {
+              _id: String((request.followerId as any)._id || ""),
+              name: (request.followerId as any).name,
+              emailId: (request.followerId as any).emailId,
+              photoURL: (request.followerId as any).photoURL,
+              statusMessage: (request.followerId as any).statusMessage,
+            }
+          : null,
+      }));
+
+      return res.status(200).json({ requests: results });
+    } catch (err: any) {
+      logApiError(req, err, { route: "GET /profile/follow-requests" });
+      return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
+    }
+  }
+);
+
+/**
  * GET /profile/search-users
  * - Requires auth
  * - Optional query param `q` (min 2 chars) filters by name/email/status

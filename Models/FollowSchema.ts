@@ -47,4 +47,12 @@ const FollowSchema = new Schema<IFollow>(
 // Prevent duplicate follow records
 FollowSchema.index({ followerId: 1, followingId: 1 }, { unique: true });
 
+FollowSchema.pre(
+  ["find", "findOne", "findOneAndUpdate", "findOneAndDelete"],
+  function (this: any) {
+    this.populate({ path: "followerId", select: "name" });
+    this.populate({ path: "followingId", select: "name" });
+  }
+);
+
 export default mongoose.model<IFollow>("Follow", FollowSchema);
