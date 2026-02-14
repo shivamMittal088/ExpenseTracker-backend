@@ -1,9 +1,11 @@
 import express, { Request, Response, NextFunction } from "express";
+import { Types } from "mongoose";
 import path from "path";
 import fs from "fs";
 import User from "../Models/UserSchema";
 import LoginHistory from "../Models/LoginHistorySchema";
 import Expense from "../Models/ExpenseSchema";
+import Follow from "../Models/FollowSchema";
 import userAuth from "../Middlewares/userAuth";
 import { IUser } from "../Models/UserSchema";
 import { logApiError, logEvent } from "../utils/logger";
@@ -278,6 +280,147 @@ profileRouter.get(
       return res.status(200).json(user);
     } catch (err: any) {
       logApiError(req, err, { route: "GET /profile/user/:userId" });
+      return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
+    }
+  }
+);
+
+/**
+ * POST /profile/follow/:userId
+ * - Requires userAuth
+ * - Creates a follow request (pending)
+ */
+profileRouter.post(
+  "/profile/follow/:userId",
+  userAuth,
+  async (req: Request, res: Response) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const targetUserId = String(req.params.userId);
+      const followerId = req.user._id;
+
+      if (!Types.ObjectId.isValid(targetUserId)) {
+        return res.status(400).json({ message: "Invalid user id" });
+      }
+      const targetObjectId = new Types.ObjectId(targetUserId);
+
+      if (String(followerId) === targetUserId) {
+        return res.status(400).json({ message: "You cannot follow yourself" });
+      }
+
+      const target = await User.findById(targetUserId).select("_id").lean();
+      if (!target) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const existing = await Follow.findOne({ followerId, followingId: targetObjectId }).lean();
+      if (existing) {
+        return res.status(200).json({ status: existing.status });
+      }
+
+      const rawNote = typeof req.body?.note === "string" ? req.body.note.trim() : "";
+      const note = rawNote.length > 0 ? rawNote.slice(0, 200) : undefined;
+
+      const follow = await Follow.create({
+        followerId,
+        followingId: targetObjectId,
+        status: "pending",
+        ...(note ? { note } : {}),
+      });
+
+      logEvent("info", "Follow request created", {
+        route: "POST /profile/follow/:userId",
+        userId: followerId,
+        targetUserId,
+      });
+
+      return res.status(201).json({ status: follow.status });
+    } catch (err: any) {
+      logApiError(req, err, { route: "POST /profile/follow/:userId" });
+      return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
+    }
+  }
+);
+
+/**
+ * DELETE /profile/follow/:userId
+ * - Requires userAuth
+ * - Cancels a pending follow request
+ */
+profileRouter.delete(
+  "/profile/follow/:userId",
+  userAuth,
+  async (req: Request, res: Response) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const targetUserId = String(req.params.userId);
+      const followerId = req.user._id;
+
+      if (!Types.ObjectId.isValid(targetUserId)) {
+        return res.status(400).json({ message: "Invalid user id" });
+      }
+      const targetObjectId = new Types.ObjectId(targetUserId);
+
+      const deleted = await Follow.findOneAndDelete({
+        followerId,
+        followingId: targetObjectId,
+        status: "pending",
+      }).lean();
+
+      if (!deleted) {
+        return res.status(404).json({ message: "Pending request not found" });
+      }
+
+      logEvent("info", "Follow request cancelled", {
+        route: "DELETE /profile/follow/:userId",
+        userId: followerId,
+        targetUserId,
+      });
+
+      return res.status(200).json({ status: "none" });
+    } catch (err: any) {
+      logApiError(req, err, { route: "DELETE /profile/follow/:userId" });
+      return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
+    }
+  }
+);
+
+/**
+ * GET /profile/follow-status/:userId
+ * - Requires userAuth
+ * - Returns follow status to target user
+ */
+profileRouter.get(
+  "/profile/follow-status/:userId",
+  userAuth,
+  async (req: Request, res: Response) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const targetUserId = String(req.params.userId);
+      const followerId = req.user._id;
+
+      if (!Types.ObjectId.isValid(targetUserId)) {
+        return res.status(400).json({ message: "Invalid user id" });
+      }
+      const targetObjectId = new Types.ObjectId(targetUserId);
+
+      const follow = await Follow.findOne({ followerId, followingId: targetObjectId }).lean();
+      if (!follow) {
+        return res.status(200).json({ status: "none" });
+      }
+
+      return res.status(200).json({ status: follow.status });
+    } catch (err: any) {
+      logApiError(req, err, { route: "GET /profile/follow-status/:userId" });
       return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
   }

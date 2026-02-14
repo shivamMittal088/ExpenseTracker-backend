@@ -4,11 +4,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
+const mongoose_1 = require("mongoose");
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const UserSchema_1 = __importDefault(require("../Models/UserSchema"));
 const LoginHistorySchema_1 = __importDefault(require("../Models/LoginHistorySchema"));
 const ExpenseSchema_1 = __importDefault(require("../Models/ExpenseSchema"));
+const FollowSchema_1 = __importDefault(require("../Models/FollowSchema"));
 const userAuth_1 = __importDefault(require("../Middlewares/userAuth"));
 const logger_1 = require("../utils/logger");
 const multer_1 = require("../config/multer");
@@ -222,6 +224,116 @@ profileRouter.get("/profile/user/:userId", userAuth_1.default, async (req, res) 
     }
     catch (err) {
         (0, logger_1.logApiError)(req, err, { route: "GET /profile/user/:userId" });
+        return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
+    }
+});
+/**
+ * POST /profile/follow/:userId
+ * - Requires userAuth
+ * - Creates a follow request (pending)
+ */
+profileRouter.post("/profile/follow/:userId", userAuth_1.default, async (req, res) => {
+    try {
+        if (!req.user) {
+            return res.status(401).json({ message: "Not authenticated" });
+        }
+        const targetUserId = String(req.params.userId);
+        const followerId = req.user._id;
+        if (!mongoose_1.Types.ObjectId.isValid(targetUserId)) {
+            return res.status(400).json({ message: "Invalid user id" });
+        }
+        const targetObjectId = new mongoose_1.Types.ObjectId(targetUserId);
+        if (String(followerId) === targetUserId) {
+            return res.status(400).json({ message: "You cannot follow yourself" });
+        }
+        const target = await UserSchema_1.default.findById(targetUserId).select("_id").lean();
+        if (!target) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        const existing = await FollowSchema_1.default.findOne({ followerId, followingId: targetObjectId }).lean();
+        if (existing) {
+            return res.status(200).json({ status: existing.status });
+        }
+        const rawNote = typeof req.body?.note === "string" ? req.body.note.trim() : "";
+        const note = rawNote.length > 0 ? rawNote.slice(0, 200) : undefined;
+        const follow = await FollowSchema_1.default.create({
+            followerId,
+            followingId: targetObjectId,
+            status: "pending",
+            ...(note ? { note } : {}),
+        });
+        (0, logger_1.logEvent)("info", "Follow request created", {
+            route: "POST /profile/follow/:userId",
+            userId: followerId,
+            targetUserId,
+        });
+        return res.status(201).json({ status: follow.status });
+    }
+    catch (err) {
+        (0, logger_1.logApiError)(req, err, { route: "POST /profile/follow/:userId" });
+        return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
+    }
+});
+/**
+ * DELETE /profile/follow/:userId
+ * - Requires userAuth
+ * - Cancels a pending follow request
+ */
+profileRouter.delete("/profile/follow/:userId", userAuth_1.default, async (req, res) => {
+    try {
+        if (!req.user) {
+            return res.status(401).json({ message: "Not authenticated" });
+        }
+        const targetUserId = String(req.params.userId);
+        const followerId = req.user._id;
+        if (!mongoose_1.Types.ObjectId.isValid(targetUserId)) {
+            return res.status(400).json({ message: "Invalid user id" });
+        }
+        const targetObjectId = new mongoose_1.Types.ObjectId(targetUserId);
+        const deleted = await FollowSchema_1.default.findOneAndDelete({
+            followerId,
+            followingId: targetObjectId,
+            status: "pending",
+        }).lean();
+        if (!deleted) {
+            return res.status(404).json({ message: "Pending request not found" });
+        }
+        (0, logger_1.logEvent)("info", "Follow request cancelled", {
+            route: "DELETE /profile/follow/:userId",
+            userId: followerId,
+            targetUserId,
+        });
+        return res.status(200).json({ status: "none" });
+    }
+    catch (err) {
+        (0, logger_1.logApiError)(req, err, { route: "DELETE /profile/follow/:userId" });
+        return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
+    }
+});
+/**
+ * GET /profile/follow-status/:userId
+ * - Requires userAuth
+ * - Returns follow status to target user
+ */
+profileRouter.get("/profile/follow-status/:userId", userAuth_1.default, async (req, res) => {
+    try {
+        if (!req.user) {
+            return res.status(401).json({ message: "Not authenticated" });
+        }
+        const targetUserId = String(req.params.userId);
+        const followerId = req.user._id;
+        if (!mongoose_1.Types.ObjectId.isValid(targetUserId)) {
+            return res.status(400).json({ message: "Invalid user id" });
+        }
+        const targetObjectId = new mongoose_1.Types.ObjectId(targetUserId);
+        const follow = await FollowSchema_1.default.findOne({ followerId, followingId: targetObjectId }).lean();
+        if (!follow) {
+            return res.status(200).json({ status: "none" });
+        }
+        return res.status(200).json({ status: follow.status });
+    }
+    catch (err) {
+        (0, logger_1.logApiError)(req, err, { route: "GET /profile/follow-status/:userId" });
         return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
 });
