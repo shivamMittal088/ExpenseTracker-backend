@@ -101,4 +101,6 @@ const UserSchema = new mongoose_1.Schema({
     },
 }, { timestamps: true } // adds createdAt & updatedAt 
 );
+// Support name/email lookups for search
+UserSchema.index({ name: "text", emailId: "text" });
 exports.default = mongoose_1.default.model("User", UserSchema);

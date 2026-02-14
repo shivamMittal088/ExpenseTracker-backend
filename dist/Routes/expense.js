@@ -650,9 +650,11 @@ expressRouter.get("/expenses/spending-trends", userAuth_1.default, async (req, r
                 groupFormat = "%Y-%m";
                 break;
             case "yearly":
-                // Last 5 years
+                // Previous 5 years (not including current year)
                 startDate = new Date(now);
                 startDate.setFullYear(now.getFullYear() - 5);
+                startDate.setMonth(0, 1); // Start from Jan 1
+                startDate.setHours(0, 0, 0, 0);
                 groupFormat = "%Y";
                 break;
             default:
@@ -722,9 +724,10 @@ expressRouter.get("/expenses/spending-trends", userAuth_1.default, async (req, r
             }
         }
         else if (view === "yearly") {
-            // Fill last 5 years
-            for (let i = 4; i >= 0; i--) {
-                const year = now.getFullYear() - i;
+            // Fill previous 5 years (e.g., 2021, 2022, 2023, 2024, 2025 if current year is 2026)
+            const currentYear = now.getFullYear();
+            for (let i = 5; i >= 1; i--) {
+                const year = currentYear - i;
                 const period = String(year);
                 const existing = trends.find(t => t.period === period);
                 filledTrends.push(existing || { period, totalAmount: 0, count: 0, avgAmount: 0, maxAmount: 0 });

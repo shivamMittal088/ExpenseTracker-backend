@@ -12,6 +12,9 @@ const ExpenseSchema_1 = __importDefault(require("../Models/ExpenseSchema"));
 const userAuth_1 = __importDefault(require("../Middlewares/userAuth"));
 const logger_1 = require("../utils/logger");
 const multer_1 = require("../config/multer");
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const DEFAULT_SEARCH_LIMIT = 8;
+const MAX_SEARCH_LIMIT = 25;
 const profileRouter = express_1.default.Router();
 /**
  * GET /profile
@@ -190,6 +193,60 @@ profileRouter.get("/profile/login-history", userAuth_1.default, async (req, res)
     }
     catch (err) {
         (0, logger_1.logApiError)(req, err, { route: "GET /profile/login-history" });
+        return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
+    }
+});
+/**
+ * GET /profile/search-users
+ * - Requires auth
+ * - Optional query param `q` (min 2 chars) filters by name/email/status
+ */
+profileRouter.get("/profile/search-users", userAuth_1.default, async (req, res) => {
+    try {
+        if (!req.user) {
+            return res.status(401).json({ message: "Not authenticated" });
+        }
+        const rawQuery = typeof req.query.q === "string" ? req.query.q.trim() : "";
+        if (rawQuery && rawQuery.length < 2) {
+            return res.status(400).json({ message: "Search query must be at least 2 characters" });
+        }
+        const parsedLimit = Number(req.query.limit);
+        const limit = Math.min(Math.max(1, Number.isNaN(parsedLimit) ? DEFAULT_SEARCH_LIMIT : parsedLimit), MAX_SEARCH_LIMIT);
+        const baseFilter = { _id: { $ne: req.user._id } };
+        const filter = rawQuery
+            ? {
+                ...baseFilter,
+                $or: [
+                    { name: { $regex: new RegExp(escapeRegex(rawQuery), "i") } },
+                    { emailId: { $regex: new RegExp(escapeRegex(rawQuery), "i") } },
+                    { statusMessage: { $regex: new RegExp(escapeRegex(rawQuery), "i") } },
+                ],
+            }
+            : baseFilter;
+        const users = await UserSchema_1.default.find(filter)
+            .select("name emailId photoURL statusMessage createdAt updatedAt")
+            .sort((rawQuery ? { createdAt: -1 } : { updatedAt: -1 }))
+            .limit(limit)
+            .lean();
+        const results = users.map((user) => ({
+            _id: user._id,
+            name: user.name,
+            emailId: user.emailId,
+            photoURL: user.photoURL,
+            statusMessage: user.statusMessage,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt,
+        }));
+        (0, logger_1.logEvent)("info", "Profile search executed", {
+            route: "GET /profile/search-users",
+            userId: req.user._id,
+            queryLength: rawQuery.length,
+            results: results.length,
+        });
+        return res.status(200).json({ query: rawQuery, results });
+    }
+    catch (err) {
+        (0, logger_1.logApiError)(req, err, { route: "GET /profile/search-users" });
         return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
 });

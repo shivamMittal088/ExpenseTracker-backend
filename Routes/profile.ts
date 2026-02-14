@@ -9,6 +9,10 @@ import { IUser } from "../Models/UserSchema";
 import { logApiError, logEvent } from "../utils/logger";
 import { avatarUpload as upload, avatarUploadsDir as uploadsDir } from "../config/multer";
 
+const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const DEFAULT_SEARCH_LIMIT = 8;
+const MAX_SEARCH_LIMIT = 25;
+
 declare global {
   namespace Express {
     interface Request {
@@ -236,6 +240,75 @@ profileRouter.get(
       return res.status(200).json(history);
     } catch (err: any) {
       logApiError(req, err, { route: "GET /profile/login-history" });
+      return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
+    }
+  }
+);
+
+/**
+ * GET /profile/search-users
+ * - Requires auth
+ * - Optional query param `q` (min 2 chars) filters by name/email/status
+ */
+profileRouter.get(
+  "/profile/search-users",
+  userAuth,
+  async (req: Request, res: Response) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const rawQuery = typeof req.query.q === "string" ? req.query.q.trim() : "";
+      if (rawQuery && rawQuery.length < 2) {
+        return res.status(400).json({ message: "Search query must be at least 2 characters" });
+      }
+
+      const parsedLimit = Number(req.query.limit);
+      const limit = Math.min(
+        Math.max(1, Number.isNaN(parsedLimit) ? DEFAULT_SEARCH_LIMIT : parsedLimit),
+        MAX_SEARCH_LIMIT
+      );
+
+      const baseFilter: Record<string, unknown> = { _id: { $ne: req.user._id } };
+
+      const filter = rawQuery
+        ? {
+            ...baseFilter,
+            $or: [
+              { name: { $regex: new RegExp(escapeRegex(rawQuery), "i") } },
+              { emailId: { $regex: new RegExp(escapeRegex(rawQuery), "i") } },
+              { statusMessage: { $regex: new RegExp(escapeRegex(rawQuery), "i") } },
+            ],
+          }
+        : baseFilter;
+
+      const users = await User.find(filter)
+        .select("name emailId photoURL statusMessage createdAt updatedAt")
+        .sort((rawQuery ? { createdAt: -1 } : { updatedAt: -1 }) as Record<string, 1 | -1>)
+        .limit(limit)
+        .lean();
+
+      const results = users.map((user) => ({
+        _id: user._id,
+        name: user.name,
+        emailId: user.emailId,
+        photoURL: user.photoURL,
+        statusMessage: user.statusMessage,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      }));
+
+      logEvent("info", "Profile search executed", {
+        route: "GET /profile/search-users",
+        userId: req.user._id,
+        queryLength: rawQuery.length,
+        results: results.length,
+      });
+
+      return res.status(200).json({ query: rawQuery, results });
+    } catch (err: any) {
+      logApiError(req, err, { route: "GET /profile/search-users" });
       return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
   }
