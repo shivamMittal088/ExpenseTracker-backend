@@ -97,7 +97,12 @@ Server runs at `http://localhost:5000`
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/profile` | Get user profile |
+| GET | `/api/profile/view` | Get user profile |
+| GET | `/api/profile/streak` | Get streak data |
+| GET | `/api/profile/login-history` | Get login history |
+| GET | `/api/profile/search-users` | Search other users by name/email |
+| GET | `/api/profile/user/:userId` | Get minimal public profile |
+| POST | `/api/profile/upload-avatar` | Upload profile avatar |
 | GET | `/api/tiles` | Get category tiles |
 | POST | `/api/tile` | Create tile |
 
