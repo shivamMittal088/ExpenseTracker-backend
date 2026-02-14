@@ -50,6 +50,11 @@ profileRouter.get(
         return res.status(404).json({ message: "User not found" });
       }
 
+      const [followersCount, followingCount] = await Promise.all([
+        Follow.countDocuments({ followingId: loggedInUserId, status: "accepted" }),
+        Follow.countDocuments({ followerId: loggedInUserId, status: "accepted" }),
+      ]);
+
       // Ensure monthlyIncome has a default value for older users who don't have the field
       const profileWithDefaults = {
         ...profile,
@@ -57,6 +62,8 @@ profileRouter.get(
         dailyBudget: profile.dailyBudget ?? 0,
         currentStreak: profile.currentStreak ?? 0,
         longestStreak: profile.longestStreak ?? 0,
+        followersCount,
+        followingCount,
       };
 
       logEvent("info", "Profile fetched", {
@@ -466,6 +473,96 @@ profileRouter.get(
       return res.status(200).json({ requests: results });
     } catch (err: any) {
       logApiError(req, err, { route: "GET /profile/follow-requests" });
+      return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
+    }
+  }
+);
+
+/**
+ * POST /profile/follow-requests/:requestId/accept
+ * - Requires userAuth
+ * - Accepts a pending follow request
+ */
+profileRouter.post(
+  "/profile/follow-requests/:requestId/accept",
+  userAuth,
+  async (req: Request, res: Response) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const requestId = String(req.params.requestId);
+      if (!Types.ObjectId.isValid(requestId)) {
+        return res.status(400).json({ message: "Invalid request id" });
+      }
+
+      const updated = await Follow.findOneAndUpdate(
+        {
+          _id: requestId,
+          followingId: req.user._id,
+          status: "pending",
+        },
+        { $set: { status: "accepted" } },
+        { new: true }
+      ).lean();
+
+      if (!updated) {
+        return res.status(404).json({ message: "Pending request not found" });
+      }
+
+      logEvent("info", "Follow request accepted", {
+        route: "POST /profile/follow-requests/:requestId/accept",
+        userId: req.user._id,
+        requestId,
+      });
+
+      return res.status(200).json({ status: "accepted" });
+    } catch (err: any) {
+      logApiError(req, err, { route: "POST /profile/follow-requests/:requestId/accept" });
+      return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
+    }
+  }
+);
+
+/**
+ * DELETE /profile/follow-requests/:requestId
+ * - Requires userAuth
+ * - Declines a pending follow request
+ */
+profileRouter.delete(
+  "/profile/follow-requests/:requestId",
+  userAuth,
+  async (req: Request, res: Response) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const requestId = String(req.params.requestId);
+      if (!Types.ObjectId.isValid(requestId)) {
+        return res.status(400).json({ message: "Invalid request id" });
+      }
+
+      const deleted = await Follow.findOneAndDelete({
+        _id: requestId,
+        followingId: req.user._id,
+        status: "pending",
+      }).lean();
+
+      if (!deleted) {
+        return res.status(404).json({ message: "Pending request not found" });
+      }
+
+      logEvent("info", "Follow request declined", {
+        route: "DELETE /profile/follow-requests/:requestId",
+        userId: req.user._id,
+        requestId,
+      });
+
+      return res.status(200).json({ status: "declined" });
+    } catch (err: any) {
+      logApiError(req, err, { route: "DELETE /profile/follow-requests/:requestId" });
       return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
   }
