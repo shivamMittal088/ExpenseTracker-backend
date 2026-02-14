@@ -1,6 +1,5 @@
 import express, { Request, Response } from "express";
 import User from "../Models/UserSchema";
-import SessionToken from "../Models/SessionTokenSchema";
 import LoginHistory from "../Models/LoginHistorySchema";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";

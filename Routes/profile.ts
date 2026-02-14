@@ -246,6 +246,44 @@ profileRouter.get(
 );
 
 /**
+ * GET /profile/user/:userId
+ * - Requires userAuth
+ * - Returns minimal public profile info for a user
+ */
+profileRouter.get(
+  "/profile/user/:userId",
+  userAuth,
+  async (req: Request, res: Response) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { userId } = req.params;
+
+      const user = await User.findById(userId)
+        .select("name emailId photoURL statusMessage createdAt")
+        .lean();
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      logEvent("info", "Public profile fetched", {
+        route: "GET /profile/user/:userId",
+        userId: req.user._id,
+        targetUserId: userId,
+      });
+
+      return res.status(200).json(user);
+    } catch (err: any) {
+      logApiError(req, err, { route: "GET /profile/user/:userId" });
+      return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
+    }
+  }
+);
+
+/**
  * GET /profile/search-users
  * - Requires auth
  * - Optional query param `q` (min 2 chars) filters by name/email/status

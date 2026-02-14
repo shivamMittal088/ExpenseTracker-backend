@@ -62,7 +62,6 @@
 import { Request, Response, NextFunction } from "express";
 import jwt, { JwtPayload } from "jsonwebtoken";
 import User from "../Models/UserSchema";
-import SessionToken from "../Models/SessionTokenSchema";
 
 /* ---- JWT Payload Type ---- */
 interface MyJwtPayload extends JwtPayload {
