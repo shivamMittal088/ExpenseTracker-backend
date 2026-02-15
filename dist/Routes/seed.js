@@ -7,6 +7,9 @@ const express = require("express");
 const seedRouter = express.Router();
 const TilesSchema_1 = __importDefault(require("../Models/TilesSchema"));
 const ExpenseSchema_1 = __importDefault(require("../Models/ExpenseSchema"));
+const UserSchema_1 = __importDefault(require("../Models/UserSchema"));
+const FollowSchema_1 = __importDefault(require("../Models/FollowSchema"));
+const bcrypt_1 = __importDefault(require("bcrypt"));
 const userAuth_1 = __importDefault(require("../Middlewares/userAuth"));
 const logger_1 = require("../utils/logger");
 seedRouter.post("/seed/tiles", userAuth_1.default, async (req, res) => {
@@ -182,6 +185,43 @@ seedRouter.delete("/seed/recurring-expenses", userAuth_1.default, async (req, re
     catch (err) {
         (0, logger_1.logApiError)(req, err, { route: "DELETE /seed/recurring-expenses" });
         return res.status(500).json({ message: "Failed to delete test expenses" });
+    }
+});
+// Seed followers for infinite scroll testing
+seedRouter.post("/seed/followers", userAuth_1.default, async (req, res) => {
+    try {
+        const userId = req.user?._id;
+        if (!userId) {
+            return res.status(401).json({ message: "Not authenticated" });
+        }
+        const count = 200;
+        const suffix = Date.now();
+        const passwordHash = await bcrypt_1.default.hash("password", 10);
+        const usersToCreate = Array.from({ length: count }, (_, index) => ({
+            name: `Follower ${index + 1}`,
+            emailId: `follower_${suffix}_${index + 1}@example.com`,
+            password: passwordHash,
+        }));
+        const createdUsers = await UserSchema_1.default.insertMany(usersToCreate);
+        const follows = createdUsers.map((user) => ({
+            followerId: user._id,
+            followingId: userId,
+            status: "accepted",
+        }));
+        await FollowSchema_1.default.insertMany(follows);
+        (0, logger_1.logEvent)("info", "Seed followers created", {
+            route: "POST /seed/followers",
+            userId,
+            count: createdUsers.length,
+        });
+        return res.status(201).json({
+            message: `Created ${createdUsers.length} followers`,
+            count: createdUsers.length,
+        });
+    }
+    catch (err) {
+        (0, logger_1.logApiError)(req, err, { route: "POST /seed/followers" });
+        return res.status(500).json({ message: "Failed to seed followers" });
     }
 });
 exports.default = seedRouter;

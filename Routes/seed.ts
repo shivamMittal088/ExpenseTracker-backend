@@ -2,6 +2,9 @@ const express = require("express");
 const seedRouter = express.Router();
 import Tiles from "../Models/TilesSchema"
 import Expense from "../Models/ExpenseSchema"
+import User from "../Models/UserSchema";
+import Follow from "../Models/FollowSchema";
+import bcrypt from "bcrypt";
 import { Request,Response,NextFunction } from "express";
 import userAuth from "../Middlewares/userAuth";
 import { logApiError, logEvent } from "../utils/logger";
@@ -197,6 +200,49 @@ seedRouter.delete("/seed/recurring-expenses", userAuth, async (req: Request, res
   } catch (err) {
     logApiError(req, err, { route: "DELETE /seed/recurring-expenses" });
     return res.status(500).json({ message: "Failed to delete test expenses" });
+  }
+});
+
+// Seed followers for infinite scroll testing
+seedRouter.post("/seed/followers", userAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?._id;
+    if (!userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const count = 200;
+    const suffix = Date.now();
+    const passwordHash = await bcrypt.hash("password", 10);
+
+    const usersToCreate = Array.from({ length: count }, (_, index) => ({
+      name: `Follower ${index + 1}`,
+      emailId: `follower_${suffix}_${index + 1}@example.com`,
+      password: passwordHash,
+    }));
+
+    const createdUsers = await User.insertMany(usersToCreate);
+    const follows = createdUsers.map((user) => ({
+      followerId: user._id,
+      followingId: userId,
+      status: "accepted",
+    }));
+
+    await Follow.insertMany(follows);
+
+    logEvent("info", "Seed followers created", {
+      route: "POST /seed/followers",
+      userId,
+      count: createdUsers.length,
+    });
+
+    return res.status(201).json({
+      message: `Created ${createdUsers.length} followers`,
+      count: createdUsers.length,
+    });
+  } catch (err) {
+    logApiError(req, err as Error, { route: "POST /seed/followers" });
+    return res.status(500).json({ message: "Failed to seed followers" });
   }
 });
 
