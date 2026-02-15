@@ -89,6 +89,22 @@ const UserSchema = new mongoose_1.Schema({
         type: Date,
         default: null,
     },
+    recentSearches: {
+        type: [
+            {
+                userId: {
+                    type: mongoose_1.Schema.Types.ObjectId,
+                    ref: "User",
+                    required: true,
+                },
+                searchedAt: {
+                    type: Date,
+                    default: Date.now,
+                },
+            },
+        ],
+        default: [],
+    },
     preferences: {
         darkMode: {
             type: Boolean,

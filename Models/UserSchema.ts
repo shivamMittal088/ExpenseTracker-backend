@@ -19,6 +19,7 @@ export interface IUser extends Document {
   currentStreak: number;
   longestStreak: number;
   lastStreakDate: Date | null;
+  recentSearches: { userId: Schema.Types.ObjectId; searchedAt: Date }[];
   preferences: UserPreferences;
   createdAt: Date;
   updatedAt: Date;
@@ -89,6 +90,23 @@ const UserSchema = new Schema<IUser>(
     lastStreakDate: {
       type: Date,
       default: null,
+    },
+
+    recentSearches: {
+      type: [
+        {
+          userId: {
+            type: Schema.Types.ObjectId,
+            ref: "User",
+            required: true,
+          },
+          searchedAt: {
+            type: Date,
+            default: Date.now,
+          },
+        },
+      ],
+      default: [],
     },
 
     preferences: {
