@@ -90,6 +90,11 @@ Server runs at `http://localhost:5000`
 |--------|----------|-------------|
 | POST | `/api/expense` | Add new expense |
 | GET | `/api/expenses` | Get expenses (with filters) |
+| GET | `/api/expenses/range` | Get expenses in a date range |
+| GET | `/api/expenses/paged` | Cursor-paginated expenses |
+| GET | `/api/expenses/recurring` | Recurring expense insights |
+| GET | `/api/expenses/payment-breakdown` | Payment mode breakdown |
+| GET | `/api/expenses/spending-trends` | Spending trends data |
 | PATCH | `/api/expense/:id` | Update expense |
 | DELETE | `/api/expense/:id` | Soft delete expense |
 
@@ -103,8 +108,26 @@ Server runs at `http://localhost:5000`
 | GET | `/api/profile/search-users` | Search other users by name/email |
 | GET | `/api/profile/user/:userId` | Get minimal public profile |
 | POST | `/api/profile/upload-avatar` | Upload profile avatar |
+| GET | `/api/profile/follow-status/:userId` | Follow status for a user |
+| POST | `/api/profile/follow/:userId` | Send follow request |
+| DELETE | `/api/profile/follow/:userId` | Cancel/unfollow |
+| GET | `/api/profile/follow-requests` | Pending follow requests |
+| POST | `/api/profile/follow-requests/:requestId/accept` | Accept follow request |
+| DELETE | `/api/profile/follow-requests/:requestId` | Decline follow request |
+| GET | `/api/profile/all-followers` | Cursor-paginated followers |
+| GET | `/api/profile/all-following` | Cursor-paginated following |
 | GET | `/api/tiles` | Get category tiles |
 | POST | `/api/tile` | Create tile |
+
+### Seed (Testing)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/seed/tiles` | Seed default tiles |
+| POST | `/api/seed/recurring-expenses` | Seed recurring expenses |
+| DELETE | `/api/seed/recurring-expenses` | Remove recurring expenses |
+| POST | `/api/seed/followers` | Seed followers |
+| POST | `/api/seed/transactions` | Seed transactions |
 
 ## Authentication
 
@@ -147,9 +170,7 @@ Set the `AXIOM_*` environment variables to enable. Falls back to console in deve
 - [ ] Private accounts
 - [ ] Following feature
 - [ ] PWA support
-- [ ] Analytics dashboard
 - [ ] Recurring expenses
-- [ ] Budget limits & alerts
 - [ ] Export expenses (CSV/PDF)
 
 ### Implemented
@@ -166,5 +187,8 @@ Set the `AXIOM_*` environment variables to enable. Falls back to console in deve
 - [x] User profile view and update (name, statusMessage, currency, preferences)
 - [x] Login history tracking (IP, browser, OS, device)
 - [x] Category tiles (CRUD) with built-in and user-created tiles
+- [x] Follow system with requests and cursor-paginated lists
+- [x] Cursor pagination for expenses and followers
+- [x] Analytics insights (payment breakdown, trends, recurring)
 - [x] Axiom logging integration for production monitoring
 - [x] Request/error logging with user context
