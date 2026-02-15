@@ -10,6 +10,23 @@ const FollowSchema_1 = __importDefault(require("../Models/FollowSchema"));
 const userAuth_1 = __importDefault(require("../Middlewares/userAuth"));
 const logger_1 = require("../utils/logger");
 const followRouter = express_1.default.Router();
+const FOLLOW_PAGE_SIZE = 20;
+const encodeCursor = (cursor) => Buffer.from(JSON.stringify(cursor), "utf8").toString("base64");
+const decodeCursor = (value) => {
+    try {
+        const parsed = JSON.parse(Buffer.from(value, "base64").toString("utf8"));
+        if (!parsed?.createdAt || !parsed?.id) {
+            return null;
+        }
+        if (!mongoose_1.Types.ObjectId.isValid(parsed.id)) {
+            return null;
+        }
+        return parsed;
+    }
+    catch {
+        return null;
+    }
+};
 /**
  * POST /profile/follow/:userId
  * - Requires userAuth
@@ -235,12 +252,33 @@ followRouter.get("/profile/all-followers", userAuth_1.default, async (req, res) 
         if (!req.user) {
             return res.status(401).json({ message: "Not authenticated" });
         }
-        const followers = await FollowSchema_1.default.find({
+        const cursorValue = typeof req.query.cursor === "string" ? req.query.cursor : "";
+        const cursor = cursorValue ? decodeCursor(cursorValue) : null;
+        if (cursorValue && !cursor) {
+            return res.status(400).json({ message: "Invalid cursor" });
+        }
+        const baseFilter = {
             followingId: req.user._id,
             status: "accepted",
+        };
+        const cursorFilter = cursor
+            ? {
+                $or: [
+                    { createdAt: { $lt: new Date(cursor.createdAt) } },
+                    {
+                        createdAt: new Date(cursor.createdAt),
+                        _id: { $lt: new mongoose_1.Types.ObjectId(cursor.id) },
+                    },
+                ],
+            }
+            : {};
+        const followers = await FollowSchema_1.default.find({
+            ...baseFilter,
+            ...cursorFilter,
         })
-            .sort({ createdAt: -1 })
+            .sort({ createdAt: -1, _id: -1 })
             .populate("followerId", "name emailId photoURL")
+            .limit(FOLLOW_PAGE_SIZE)
             .lean();
         const results = followers.map((follow) => ({
             id: String(follow._id),
@@ -254,7 +292,11 @@ followRouter.get("/profile/all-followers", userAuth_1.default, async (req, res) 
                 }
                 : null,
         }));
-        return res.status(200).json({ followers: results });
+        const last = followers[followers.length - 1];
+        const nextCursor = last && followers.length === FOLLOW_PAGE_SIZE
+            ? encodeCursor({ createdAt: new Date(last.createdAt).toISOString(), id: String(last._id) })
+            : null;
+        return res.status(200).json({ followers: results, nextCursor });
     }
     catch (err) {
         (0, logger_1.logApiError)(req, err, { route: "GET /profile/all-followers" });
@@ -271,12 +313,33 @@ followRouter.get("/profile/all-following", userAuth_1.default, async (req, res) 
         if (!req.user) {
             return res.status(401).json({ message: "Not authenticated" });
         }
-        const following = await FollowSchema_1.default.find({
+        const cursorValue = typeof req.query.cursor === "string" ? req.query.cursor : "";
+        const cursor = cursorValue ? decodeCursor(cursorValue) : null;
+        if (cursorValue && !cursor) {
+            return res.status(400).json({ message: "Invalid cursor" });
+        }
+        const baseFilter = {
             followerId: req.user._id,
             status: "accepted",
+        };
+        const cursorFilter = cursor
+            ? {
+                $or: [
+                    { createdAt: { $lt: new Date(cursor.createdAt) } },
+                    {
+                        createdAt: new Date(cursor.createdAt),
+                        _id: { $lt: new mongoose_1.Types.ObjectId(cursor.id) },
+                    },
+                ],
+            }
+            : {};
+        const following = await FollowSchema_1.default.find({
+            ...baseFilter,
+            ...cursorFilter,
         })
-            .sort({ createdAt: -1 })
+            .sort({ createdAt: -1, _id: -1 })
             .populate("followingId", "name emailId photoURL")
+            .limit(FOLLOW_PAGE_SIZE)
             .lean();
         const results = following.map((follow) => ({
             id: String(follow._id),
@@ -290,7 +353,11 @@ followRouter.get("/profile/all-following", userAuth_1.default, async (req, res) 
                 }
                 : null,
         }));
-        return res.status(200).json({ following: results });
+        const last = following[following.length - 1];
+        const nextCursor = last && following.length === FOLLOW_PAGE_SIZE
+            ? encodeCursor({ createdAt: new Date(last.createdAt).toISOString(), id: String(last._id) })
+            : null;
+        return res.status(200).json({ following: results, nextCursor });
     }
     catch (err) {
         (0, logger_1.logApiError)(req, err, { route: "GET /profile/all-following" });

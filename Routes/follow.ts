@@ -7,6 +7,31 @@ import { logApiError, logEvent } from "../utils/logger";
 
 const followRouter = express.Router();
 
+const FOLLOW_PAGE_SIZE = 20;
+
+type FollowCursor = {
+  createdAt: string;
+  id: string;
+};
+
+const encodeCursor = (cursor: FollowCursor) =>
+  Buffer.from(JSON.stringify(cursor), "utf8").toString("base64");
+
+const decodeCursor = (value: string): FollowCursor | null => {
+  try {
+    const parsed = JSON.parse(Buffer.from(value, "base64").toString("utf8")) as FollowCursor;
+    if (!parsed?.createdAt || !parsed?.id) {
+      return null;
+    }
+    if (!Types.ObjectId.isValid(parsed.id)) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
 /**
  * POST /profile/follow/:userId
  * - Requires userAuth
@@ -296,12 +321,36 @@ followRouter.get(
         return res.status(401).json({ message: "Not authenticated" });
       }
 
-      const followers = await Follow.find({
+      const cursorValue = typeof req.query.cursor === "string" ? req.query.cursor : "";
+      const cursor = cursorValue ? decodeCursor(cursorValue) : null;
+      if (cursorValue && !cursor) {
+        return res.status(400).json({ message: "Invalid cursor" });
+      }
+
+      const baseFilter: Record<string, unknown> = {
         followingId: req.user._id,
         status: "accepted",
+      };
+
+      const cursorFilter = cursor
+        ? {
+            $or: [
+              { createdAt: { $lt: new Date(cursor.createdAt) } },
+              {
+                createdAt: new Date(cursor.createdAt),
+                _id: { $lt: new Types.ObjectId(cursor.id) },
+              },
+            ],
+          }
+        : {};
+
+      const followers = await Follow.find({
+        ...baseFilter,
+        ...cursorFilter,
       })
-        .sort({ createdAt: -1 })
+        .sort({ createdAt: -1, _id: -1 })
         .populate("followerId", "name emailId photoURL")
+        .limit(FOLLOW_PAGE_SIZE)
         .lean();
 
       const results = followers.map((follow) => ({
@@ -317,7 +366,12 @@ followRouter.get(
           : null,
       }));
 
-      return res.status(200).json({ followers: results });
+      const last = followers[followers.length - 1];
+      const nextCursor = last && followers.length === FOLLOW_PAGE_SIZE
+        ? encodeCursor({ createdAt: new Date(last.createdAt).toISOString(), id: String(last._id) })
+        : null;
+
+      return res.status(200).json({ followers: results, nextCursor });
     } catch (err: any) {
       logApiError(req, err, { route: "GET /profile/all-followers" });
       return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
@@ -339,12 +393,36 @@ followRouter.get(
         return res.status(401).json({ message: "Not authenticated" });
       }
 
-      const following = await Follow.find({
+      const cursorValue = typeof req.query.cursor === "string" ? req.query.cursor : "";
+      const cursor = cursorValue ? decodeCursor(cursorValue) : null;
+      if (cursorValue && !cursor) {
+        return res.status(400).json({ message: "Invalid cursor" });
+      }
+
+      const baseFilter: Record<string, unknown> = {
         followerId: req.user._id,
         status: "accepted",
+      };
+
+      const cursorFilter = cursor
+        ? {
+            $or: [
+              { createdAt: { $lt: new Date(cursor.createdAt) } },
+              {
+                createdAt: new Date(cursor.createdAt),
+                _id: { $lt: new Types.ObjectId(cursor.id) },
+              },
+            ],
+          }
+        : {};
+
+      const following = await Follow.find({
+        ...baseFilter,
+        ...cursorFilter,
       })
-        .sort({ createdAt: -1 })
+        .sort({ createdAt: -1, _id: -1 })
         .populate("followingId", "name emailId photoURL")
+        .limit(FOLLOW_PAGE_SIZE)
         .lean();
 
       const results = following.map((follow) => ({
@@ -360,7 +438,12 @@ followRouter.get(
           : null,
       }));
 
-      return res.status(200).json({ following: results });
+      const last = following[following.length - 1];
+      const nextCursor = last && following.length === FOLLOW_PAGE_SIZE
+        ? encodeCursor({ createdAt: new Date(last.createdAt).toISOString(), id: String(last._id) })
+        : null;
+
+      return res.status(200).json({ following: results, nextCursor });
     } catch (err: any) {
       logApiError(req, err, { route: "GET /profile/all-following" });
       return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
