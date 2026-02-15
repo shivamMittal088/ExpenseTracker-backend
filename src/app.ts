@@ -10,7 +10,8 @@ import { sendLog } from "../config/axiomClient";
 
 import authRouter from "../Routes/auth";
 import profileRouter from "../Routes/profile";
-import recentSearchRouter from "../Routes/recentSearch";
+import searchRouter from "../Routes/search";
+import followRouter from "../Routes/follow";
 import expenseRouter from "../Routes/expense";
 import seedRouter from "../Routes/seed";
 import tileRouter from "../Routes/tile";
@@ -64,7 +65,8 @@ app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 // Routes
 app.use("/api/auth/", authRouter);
 app.use("/api/",profileRouter);
-app.use("/api/", recentSearchRouter);
+app.use("/api/", searchRouter);
+app.use("/api/", followRouter);
 app.use("/api/",expenseRouter);
 app.use("/api/",seedRouter);
 app.use("/api/",tileRouter);

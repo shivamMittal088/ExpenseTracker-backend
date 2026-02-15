@@ -67,7 +67,7 @@ const FollowSchema = new mongoose_1.Schema({
 // Prevent duplicate follow records
 FollowSchema.index({ followerId: 1, followingId: 1 }, { unique: true });
 FollowSchema.pre(["find", "findOne", "findOneAndUpdate", "findOneAndDelete"], function () {
-    this.populate({ path: "followerId", select: "name" });
-    this.populate({ path: "followingId", select: "name" });
+    this.populate({ path: "followerId", select: "name emailId photoURL" });
+    this.populate({ path: "followingId", select: "name emailId photoURL" });
 });
 exports.default = mongoose_1.default.model("Follow", FollowSchema);

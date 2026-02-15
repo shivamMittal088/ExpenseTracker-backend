@@ -11,7 +11,8 @@ const path_1 = __importDefault(require("path"));
 const axiomLogger_1 = require("../Middlewares/axiomLogger");
 const auth_1 = __importDefault(require("../Routes/auth"));
 const profile_1 = __importDefault(require("../Routes/profile"));
-const recentSearch_1 = __importDefault(require("../Routes/recentSearch"));
+const search_1 = __importDefault(require("../Routes/search"));
+const follow_1 = __importDefault(require("../Routes/follow"));
 const expense_1 = __importDefault(require("../Routes/expense"));
 const seed_1 = __importDefault(require("../Routes/seed"));
 const tile_1 = __importDefault(require("../Routes/tile"));
@@ -54,7 +55,8 @@ app.use("/uploads", express_1.default.static(path_1.default.join(__dirname, ".."
 // Routes
 app.use("/api/auth/", auth_1.default);
 app.use("/api/", profile_1.default);
-app.use("/api/", recentSearch_1.default);
+app.use("/api/", search_1.default);
+app.use("/api/", follow_1.default);
 app.use("/api/", expense_1.default);
 app.use("/api/", seed_1.default);
 app.use("/api/", tile_1.default);
