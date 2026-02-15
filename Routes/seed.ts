@@ -246,4 +246,59 @@ seedRouter.post("/seed/followers", userAuth, async (req: Request, res: Response)
   }
 });
 
+// Seed expenses for cursor pagination testing
+seedRouter.post("/seed/transactions", userAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?._id;
+    if (!userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const count = 200;
+    const now = Date.now();
+    const categories = [
+      { name: "Food", emoji: "🍔", color: "#F97316" },
+      { name: "Travel", emoji: "🚕", color: "#3B82F6" },
+      { name: "Bills", emoji: "💡", color: "#F59E0B" },
+      { name: "Shopping", emoji: "🛍️", color: "#EC4899" },
+      { name: "Health", emoji: "💊", color: "#22C55E" },
+      { name: "Coffee", emoji: "☕", color: "#78350F" },
+    ];
+    const paymentModes = ["cash", "card", "bank_transfer", "wallet", "UPI"];
+
+    const expenses = Array.from({ length: count }, (_, index) => {
+      const category = categories[index % categories.length];
+      const payment_mode = paymentModes[index % paymentModes.length];
+      const amount = 50 + Math.floor(Math.random() * 1950);
+      const occurredAt = new Date(now - index * 60 * 60 * 1000);
+
+      return {
+        userId,
+        amount,
+        category,
+        payment_mode,
+        occurredAt,
+        notes: `Seeded transaction ${index + 1}`,
+        deleted: false,
+      };
+    });
+
+    const created = await Expense.insertMany(expenses);
+
+    logEvent("info", "Seed transactions created", {
+      route: "POST /seed/transactions",
+      userId,
+      count: created.length,
+    });
+
+    return res.status(201).json({
+      message: `Created ${created.length} transactions`,
+      count: created.length,
+    });
+  } catch (err) {
+    logApiError(req, err as Error, { route: "POST /seed/transactions" });
+    return res.status(500).json({ message: "Failed to seed transactions" });
+  }
+});
+
 export default seedRouter;

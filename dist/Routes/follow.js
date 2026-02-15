@@ -77,7 +77,7 @@ followRouter.post("/profile/follow/:userId", userAuth_1.default, async (req, res
 /**
  * DELETE /profile/follow/:userId
  * - Requires userAuth
- * - Cancels a pending follow request
+ * - Cancels a pending follow request or unfollows an accepted user
  */
 followRouter.delete("/profile/follow/:userId", userAuth_1.default, async (req, res) => {
     try {
@@ -93,15 +93,16 @@ followRouter.delete("/profile/follow/:userId", userAuth_1.default, async (req, r
         const deleted = await FollowSchema_1.default.findOneAndDelete({
             followerId,
             followingId: targetObjectId,
-            status: "pending",
+            status: { $in: ["pending", "accepted"] },
         }).lean();
         if (!deleted) {
-            return res.status(404).json({ message: "Pending request not found" });
+            return res.status(404).json({ message: "Follow relationship not found" });
         }
-        (0, logger_1.logEvent)("info", "Follow request cancelled", {
+        (0, logger_1.logEvent)("info", "Follow removed", {
             route: "DELETE /profile/follow/:userId",
             userId: followerId,
             targetUserId,
+            previousStatus: deleted.status,
         });
         return res.status(200).json({ status: "none" });
     }
