@@ -217,12 +217,20 @@ profileRouter.get("/profile/user/:userId", userAuth_1.default, async (req, res) 
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
+        const [followersCount, followingCount] = await Promise.all([
+            FollowSchema_1.default.countDocuments({ followingId: userId, status: "accepted" }),
+            FollowSchema_1.default.countDocuments({ followerId: userId, status: "accepted" }),
+        ]);
         (0, logger_1.logEvent)("info", "Public profile fetched", {
             route: "GET /profile/user/:userId",
             userId: req.user._id,
             targetUserId: userId,
         });
-        return res.status(200).json(user);
+        return res.status(200).json({
+            ...user,
+            followersCount,
+            followingCount,
+        });
     }
     catch (err) {
         (0, logger_1.logApiError)(req, err, { route: "GET /profile/user/:userId" });

@@ -274,13 +274,22 @@ profileRouter.get(
         return res.status(404).json({ message: "User not found" });
       }
 
+      const [followersCount, followingCount] = await Promise.all([
+        Follow.countDocuments({ followingId: userId, status: "accepted" }),
+        Follow.countDocuments({ followerId: userId, status: "accepted" }),
+      ]);
+
       logEvent("info", "Public profile fetched", {
         route: "GET /profile/user/:userId",
         userId: req.user._id,
         targetUserId: userId,
       });
 
-      return res.status(200).json(user);
+      return res.status(200).json({
+        ...user,
+        followersCount,
+        followingCount,
+      });
     } catch (err: any) {
       logApiError(req, err, { route: "GET /profile/user/:userId" });
       return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
