@@ -40,7 +40,7 @@ tileRouter.get("/tiles", userAuth ,async (req:Request, res:Response) => {
 
 tileRouter.post("/tiles/add", userAuth, async(req:Request,res:Response)=>{
   try{
-    const {name , color ,userId ,emoji} = req.body;
+    const { name, color, emoji } = req.body;
 
   const authReq = req as AuthRequest;
   const loggedInUserId = authReq.user._id;
@@ -69,10 +69,6 @@ tileRouter.post("/tiles/add", userAuth, async(req:Request,res:Response)=>{
     logApiError(req, err, { route: "POST /tiles/add" });
     res.status(500).json({ message: "Failed to add tile" });
   }
-})
-
-tileRouter.patch("tiles/update", userAuth , async(req:Request ,res:Response)=>{
-
 })
 
 

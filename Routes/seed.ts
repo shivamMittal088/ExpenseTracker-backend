@@ -5,7 +5,7 @@ import Expense from "../Models/ExpenseSchema"
 import User from "../Models/UserSchema";
 import Follow from "../Models/FollowSchema";
 import bcrypt from "bcrypt";
-import { Request,Response,NextFunction } from "express";
+import { Request, Response } from "express";
 import userAuth from "../Middlewares/userAuth";
 import { logApiError, logEvent } from "../utils/logger";
 

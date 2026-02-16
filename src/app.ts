@@ -4,10 +4,6 @@ import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 import path from "path";
 import { axiomRequestLogger } from "../Middlewares/axiomLogger";
-import { sendLog } from "../config/axiomClient";
-
-
-
 import authRouter from "../Routes/auth";
 import profileRouter from "../Routes/profile";
 import searchRouter from "../Routes/search";

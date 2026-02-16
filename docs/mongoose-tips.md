@@ -34,7 +34,6 @@ const ExpenseSchema = new Schema({
 When you only need to read data (not modify it), use `.lean()` to get plain JavaScript objects instead of Mongoose documents.
 
 ```typescript
-const history = await LoginHistory.find({ userId })
   .sort({ loginAt: -1 })
   .lean();
 ```

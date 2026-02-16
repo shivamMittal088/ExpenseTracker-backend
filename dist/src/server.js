@@ -14,7 +14,6 @@ const PORT = process.env.PORT || 5000;
 const server = http_1.default.createServer(app_1.default);
 (0, database_1.connectDB)()
     .then(() => {
-    console.log("Database connected successfully");
     // Start cron jobs
     (0, streakCron_1.startStreakCron)();
     void (0, axiomClient_1.sendLog)({
@@ -24,10 +23,8 @@ const server = http_1.default.createServer(app_1.default);
         dataset: process.env.AXIOM_DATASET,
     });
     server.listen(PORT, () => {
-        console.log(`Server running on port ${PORT}`);
     });
 })
     .catch((err) => {
-    console.error("Database connection failed ❌", err);
     process.exit(1);
 });

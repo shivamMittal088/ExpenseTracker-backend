@@ -104,7 +104,6 @@ Server runs at `http://localhost:5000`
 |--------|----------|-------------|
 | GET | `/api/profile/view` | Get user profile |
 | GET | `/api/profile/streak` | Get streak data |
-| GET | `/api/profile/login-history` | Get login history |
 | GET | `/api/profile/search-users` | Search other users by name/email |
 | GET | `/api/profile/user/:userId` | Get minimal public profile |
 | POST | `/api/profile/upload-avatar` | Upload profile avatar |
@@ -177,14 +176,14 @@ Set the `AXIOM_*` environment variables to enable. Falls back to console in deve
 - [x] Add expense with validation and payment mode normalization
 - [x] Fetch daily expenses by local date with timezone handling
 - [x] Soft hide/restore expenses via `deleted` flag
-- [x] Update expense fields (amount, category, notes, payment mode, currency, occurredAt)
+- [x] Update expense fields (amount, category, notes, payment mode, occurredAt)
 - [x] Auth-protected routes using `userAuth` middleware
 - [x] Single-device login enforcement
 - [x] Session token management with expiry
 - [x] User signup with password hashing (bcrypt)
 - [x] User login with JWT HTTP-only cookies
 - [x] Password update with session invalidation
-- [x] User profile view and update (name, statusMessage, currency, preferences)
+- [x] User profile view and update (name, statusMessage, preferences)
 - [x] Login history tracking (IP, browser, OS, device)
 - [x] Category tiles (CRUD) with built-in and user-created tiles
 - [x] Follow system with requests and cursor-paginated lists

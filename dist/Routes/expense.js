@@ -29,7 +29,7 @@ const decodeExpenseCursor = (value) => {
 };
 expressRouter.post("/expense/add", userAuth_1.default, async (req, res, next) => {
     try {
-        const { amount, category, notes, payment_mode, currency, occurredAt, userId: bodyUserId } = req.body || {};
+        const { amount, category, notes, payment_mode, occurredAt, userId: bodyUserId } = req.body || {};
         const userId = req.user?._id || bodyUserId; // fallback to body for Postman testing
         // Normalize payment_mode: "CASH" -> "cash", "upi" -> "UPI"
         const normalizedPaymentMode = typeof payment_mode === "string"
@@ -39,15 +39,6 @@ expressRouter.post("/expense/add", userAuth_1.default, async (req, res, next) =>
             : "";
         const allowedPaymentModes = new Set(["cash", "card", "bank_transfer", "wallet", "UPI"]);
         const errors = [];
-        /*
-        // With Array (slower) - has to check each item one by one
-        const allowedModes = ["cash", "card", "bank_transfer", "wallet", "UPI"];
-        allowedModes.includes("UPI");  // O(n) - checks 5 items
-  
-        // With Set (faster) - hash-based lookup
-        const allowedModes = new Set(["cash", "card", "bank_transfer", "wallet", "UPI"]);
-        allowedModes.has("UPI");  // O(1) - instant
-        */
         if (typeof amount !== "number" || Number.isNaN(amount) || amount <= 0) {
             errors.push("Enter valid amount");
         }
@@ -59,9 +50,6 @@ expressRouter.post("/expense/add", userAuth_1.default, async (req, res, next) =>
         }
         if (!allowedPaymentModes.has(normalizedPaymentMode)) {
             errors.push("payment_mode must be one of cash, card, bank_transfer, wallet, UPI");
-        }
-        if (currency && (typeof currency !== "string" || currency.length !== 3)) {
-            errors.push("currency must be a 3-letter code (e.g. INR)");
         }
         if (notes && typeof notes !== "string") {
             errors.push("notes must be a string");
@@ -91,9 +79,6 @@ expressRouter.post("/expense/add", userAuth_1.default, async (req, res, next) =>
             occurredAt: occurredAtDate,
             userId,
         };
-        if (currency) {
-            expenseDoc.currency = currency.toUpperCase();
-        }
         const newExpense = await ExpenseSchema_1.default.create(expenseDoc);
         (0, logger_1.logEvent)("info", "Expense created", {
             route: "POST /expense/add",
@@ -245,7 +230,7 @@ expressRouter.patch("/expense/:expenseId/hide", userAuth_1.default, async (req, 
         return res.status(500).json({ message: "Failed to update expense" });
     }
 });
-// Update an expense (amount, category, notes, payment_mode, currency, occurredAt)
+// Update an expense (amount, category, notes, payment_mode, occurredAt)
 expressRouter.patch("/expense/:expenseId", userAuth_1.default, async (req, res) => {
     try {
         const { expenseId } = req.params;
@@ -258,7 +243,7 @@ expressRouter.patch("/expense/:expenseId", userAuth_1.default, async (req, res) 
             });
             return res.status(400).json({ message: "Invalid expense id" });
         }
-        const { amount, category, notes, payment_mode, currency, occurredAt } = req.body || {};
+        const { amount, category, notes, payment_mode, occurredAt } = req.body || {};
         const updateDoc = {};
         const errors = [];
         if (amount !== undefined) {
@@ -305,14 +290,6 @@ expressRouter.patch("/expense/:expenseId", userAuth_1.default, async (req, res) 
             }
             else {
                 updateDoc.payment_mode = normalizedPaymentMode;
-            }
-        }
-        if (currency !== undefined) {
-            if (typeof currency !== "string" || currency.length !== 3) {
-                errors.push("currency must be a 3-letter code (e.g. INR)");
-            }
-            else {
-                updateDoc.currency = currency.toUpperCase();
             }
         }
         if (occurredAt !== undefined) {

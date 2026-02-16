@@ -21,10 +21,6 @@ const logEvent = (level, message, meta = {}) => {
         message,
         ...meta,
     });
-    if (process.env.NODE_ENV !== "production") {
-        const method = level === "error" ? console.error : level === "warn" ? console.warn : console.log;
-        method(`[${level}] ${message}`, meta);
-    }
 };
 exports.logEvent = logEvent;
 const logApiError = (req, err, meta = {}) => {

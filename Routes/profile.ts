@@ -1,14 +1,13 @@
-import express, { Request, Response, NextFunction } from "express";
+import express, { Request, Response } from "express";
 import path from "path";
 import fs from "fs";
 import User from "../Models/UserSchema";
-import LoginHistory from "../Models/LoginHistorySchema";
 import Expense from "../Models/ExpenseSchema";
 import Follow from "../Models/FollowSchema";
 import userAuth from "../Middlewares/userAuth";
 import { IUser } from "../Models/UserSchema";
 import { logApiError, logEvent } from "../utils/logger";
-import { avatarUpload as upload, avatarUploadsDir as uploadsDir } from "../config/multer";
+import { avatarUpload as upload } from "../config/multer";
 
 
 declare global {
@@ -31,7 +30,7 @@ const profileRouter = express.Router();
 profileRouter.get(
   "/profile/view",
   userAuth,
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ message: "Not authenticated" });
@@ -78,7 +77,7 @@ profileRouter.get(
 /**
  * PATCH /profile/update
  * - Requires userAuth middleware to populate req.user
- * - Updates allowed fields: name, statusMessage, currency, preferences
+ * - Updates allowed fields: name, statusMessage, preferences
  */
 profileRouter.patch(
   "/profile/update",
@@ -90,13 +89,12 @@ profileRouter.patch(
       }
 
       const loggedInUserId = req.user._id;
-      const { name, statusMessage, currency, preferences, monthlyIncome, dailyBudget } = req.body;
+      const { name, statusMessage, preferences, monthlyIncome, dailyBudget } = req.body;
 
       // Build update object with only allowed fields
       const updateData: Record<string, unknown> = {};
       if (name !== undefined) updateData.name = name;
       if (statusMessage !== undefined) updateData.statusMessage = statusMessage;
-      if (currency !== undefined) updateData.currency = currency;
       if (preferences !== undefined) updateData.preferences = preferences;
       if (monthlyIncome !== undefined) updateData.monthlyIncome = monthlyIncome;
       if (dailyBudget !== undefined) updateData.dailyBudget = dailyBudget;
@@ -210,41 +208,6 @@ profileRouter.get(
       });
     } catch (err: any) {
       logApiError(req, err, { route: "GET /profile/streak" });
-      return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
-    }
-  }
-);
-
-/**
- * GET /profile/login-history
- * - Requires userAuth middleware
- * - Returns the user's recent login history (last 20)
- */
-profileRouter.get(
-  "/profile/login-history",
-  userAuth,
-  async (req: Request, res: Response) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ message: "Not authenticated" });
-      }
-
-      const loggedInUserId = req.user._id;
-
-      const history = await LoginHistory.find({ userId: loggedInUserId })
-        .sort({ loginAt: -1 })
-        .limit(20)
-        .lean();
-
-      logEvent("info", "Login history fetched", {
-        route: "GET /profile/login-history",
-        userId: loggedInUserId,
-        count: history.length,
-      });
-
-      return res.status(200).json(history);
-    } catch (err: any) {
-      logApiError(req, err, { route: "GET /profile/login-history" });
       return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
   }

@@ -55,7 +55,7 @@ export interface IUser extends Document {
   password: string;
   photoURL?: string;
   statusMessage?: string;
-  currency: "INR" | "USD" | "EUR";
+  currency: "INR";
   preferences: {
     darkMode: boolean;
     startWeekOnMonday: boolean;

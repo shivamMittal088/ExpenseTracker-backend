@@ -2,7 +2,7 @@ import express, { Request, Response } from "express";
 import { Types } from "mongoose";
 import User from "../Models/UserSchema";
 import userAuth from "../Middlewares/userAuth";
-import { logApiError, logEvent } from "../utils/logger";
+import { logApiError } from "../utils/logger";
 
 const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const DEFAULT_SEARCH_LIMIT = 8;
@@ -212,13 +212,6 @@ searchRouter.get(
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       }));
-
-      logEvent("info", "Profile search executed", {
-        route: "GET /profile/search-users",
-        userId: req.user._id,
-        queryLength: rawQuery.length,
-        results: results.length,
-      });
 
       return res.status(200).json({ query: rawQuery, results });
     } catch (err: any) {

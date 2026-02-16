@@ -37,12 +37,12 @@ const ExpenseSchema = new Schema({
     min: 0 
 },
 
-  currency: { 
-    type: String, 
-    default: 'INR', 
-    uppercase: true, 
-    length: 3 
-},
+  currency: {
+    type: String,
+    default: 'INR',
+    uppercase: true,
+    enum: ['INR'],
+  },
 
   category: { 
     type: CategorySchema, 

@@ -58,8 +58,3 @@ export const avatarUpload = multer({
   },
 });
 
-// Export uploads directory path for use in other files
-export const avatarUploadsDir = uploadsDir;
-
-// Export isVercel flag for other files to check
-export { isVercel };

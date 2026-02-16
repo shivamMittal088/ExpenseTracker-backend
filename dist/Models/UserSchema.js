@@ -62,7 +62,7 @@ const UserSchema = new mongoose_1.Schema({
     },
     currency: {
         type: String,
-        enum: ["INR", "USD", "EUR"],
+        enum: ["INR"],
         default: "INR",
     },
     monthlyIncome: {

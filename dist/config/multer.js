@@ -3,13 +3,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.isVercel = exports.avatarUploadsDir = exports.avatarUpload = void 0;
+exports.avatarUpload = void 0;
 const multer_1 = __importDefault(require("multer"));
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 // Check if running on Vercel (serverless) - filesystem is read-only except /tmp
 const isVercel = process.env.VERCEL === "1" || process.env.VERCEL_ENV;
-exports.isVercel = isVercel;
 // Use /tmp on Vercel, local uploads folder otherwise
 const uploadsDir = isVercel
     ? "/tmp/avatars"
@@ -54,5 +53,3 @@ exports.avatarUpload = (0, multer_1.default)({
         fileSize: 5 * 1024 * 1024, // 5MB max
     },
 });
-// Export uploads directory path for use in other files
-exports.avatarUploadsDir = uploadsDir;

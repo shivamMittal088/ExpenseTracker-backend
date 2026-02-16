@@ -36,7 +36,7 @@ const ExpenseSchema = new Schema({
         type: String,
         default: 'INR',
         uppercase: true,
-        length: 3
+        enum: ['INR'],
     },
     category: {
         type: CategorySchema,

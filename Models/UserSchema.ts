@@ -13,7 +13,7 @@ export interface IUser extends Document {
   password: string;
   photoURL?: string;
   statusMessage?: string;
-  currency: "INR" | "USD" | "EUR";
+  currency: "INR";
   monthlyIncome: number;
   dailyBudget: number;
   currentStreak: number;
@@ -58,9 +58,9 @@ const UserSchema = new Schema<IUser>(
     },
 
     currency: {
-    type: String,
-    enum: ["INR", "USD", "EUR"],
-    default: "INR",
+      type: String,
+      enum: ["INR"],
+      default: "INR",
     },
 
     monthlyIncome: {

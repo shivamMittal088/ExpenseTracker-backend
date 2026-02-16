@@ -162,12 +162,6 @@ searchRouter.get("/profile/search-users", userAuth_1.default, async (req, res) =
             createdAt: user.createdAt,
             updatedAt: user.updatedAt,
         }));
-        (0, logger_1.logEvent)("info", "Profile search executed", {
-            route: "GET /profile/search-users",
-            userId: req.user._id,
-            queryLength: rawQuery.length,
-            results: results.length,
-        });
         return res.status(200).json({ query: rawQuery, results });
     }
     catch (err) {
