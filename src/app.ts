@@ -11,7 +11,6 @@ import followRouter from "../Routes/follow";
 import expenseRouter from "../Routes/expense";
 import seedRouter from "../Routes/seed";
 import tileRouter from "../Routes/tile";
-import cronRouter from "../Routes/cron";
 
 dotenv.config();
 
@@ -66,7 +65,6 @@ app.use("/api/", followRouter);
 app.use("/api/",expenseRouter);
 app.use("/api/",seedRouter);
 app.use("/api/",tileRouter);
-app.use("/api/",cronRouter);
 
 app.get("/test", (req, res) => {
   res.send("Server alive");

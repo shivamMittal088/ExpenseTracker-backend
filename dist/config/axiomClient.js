@@ -19,10 +19,8 @@ const axiomClient = axiomToken
     : null;
 exports.axiomReady = Boolean(axiomClient && axiomDataset);
 const sendLog = async (event) => {
+    console.log("[axiom event]", event);
     if (!exports.axiomReady) {
-        if (process.env.NODE_ENV !== "production") {
-            console.log("[axiom disabled]", event);
-        }
         return;
     }
     try {

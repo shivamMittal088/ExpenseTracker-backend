@@ -20,10 +20,8 @@ export type LogEvent = Record<string, unknown> & { message?: string };
 export const axiomReady = Boolean(axiomClient && axiomDataset);
 
 export const sendLog = async (event: LogEvent): Promise<void> => {
+  console.log("[axiom event]", event);
   if (!axiomReady) {
-    if (process.env.NODE_ENV !== "production") {
-      console.log("[axiom disabled]", event);
-    }
     return;
   }
 

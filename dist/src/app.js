@@ -16,7 +16,6 @@ const follow_1 = __importDefault(require("../Routes/follow"));
 const expense_1 = __importDefault(require("../Routes/expense"));
 const seed_1 = __importDefault(require("../Routes/seed"));
 const tile_1 = __importDefault(require("../Routes/tile"));
-const cron_1 = __importDefault(require("../Routes/cron"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
@@ -60,7 +59,6 @@ app.use("/api/", follow_1.default);
 app.use("/api/", expense_1.default);
 app.use("/api/", seed_1.default);
 app.use("/api/", tile_1.default);
-app.use("/api/", cron_1.default);
 app.get("/test", (req, res) => {
     res.send("Server alive");
 });
