@@ -24,11 +24,11 @@ searchRouter.get("/profile/recent-searches", userAuth_1.default, async (req, res
         }
         const user = await UserSchema_1.default.findById(req.user._id)
             .select("recentSearches")
-            .populate("recentSearches.userId", "name emailId photoURL statusMessage")
+            .populate("recentSearches.userId", "name emailId photoURL statusMessage isPublic")
             .lean();
         const recent = (user?.recentSearches || []).map((entry) => ({
             searchedAt: entry.searchedAt,
-            user: entry.userId
+            user: entry.userId && entry.userId.isPublic
                 ? {
                     _id: String(entry.userId._id || ""),
                     name: entry.userId.name,
@@ -63,6 +63,12 @@ searchRouter.post("/profile/recent-searches", userAuth_1.default, async (req, re
             return res.status(200).json({ status: "ignored" });
         }
         const targetObjectId = new mongoose_1.Types.ObjectId(targetUserId);
+        const targetUser = await UserSchema_1.default.findById(targetObjectId)
+            .select("isPublic")
+            .lean();
+        if (!targetUser || !targetUser.isPublic) {
+            return res.status(200).json({ status: "ignored" });
+        }
         await UserSchema_1.default.updateOne({ _id: req.user._id }, { $pull: { recentSearches: { userId: targetObjectId } } });
         await UserSchema_1.default.updateOne({ _id: req.user._id }, {
             $push: {
@@ -137,7 +143,10 @@ searchRouter.get("/profile/search-users", userAuth_1.default, async (req, res) =
         }
         const parsedLimit = Number(req.query.limit);
         const limit = Math.min(Math.max(1, Number.isNaN(parsedLimit) ? DEFAULT_SEARCH_LIMIT : parsedLimit), MAX_SEARCH_LIMIT);
-        const baseFilter = { _id: { $ne: req.user._id } };
+        const baseFilter = {
+            _id: { $ne: req.user._id },
+            isPublic: true,
+        };
         const filter = rawQuery
             ? {
                 ...baseFilter,

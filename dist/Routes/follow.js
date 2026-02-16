@@ -46,9 +46,12 @@ followRouter.post("/profile/follow/:userId", userAuth_1.default, async (req, res
         if (String(followerId) === targetUserId) {
             return res.status(400).json({ message: "You cannot follow yourself" });
         }
-        const target = await UserSchema_1.default.findById(targetUserId).select("_id").lean();
+        const target = await UserSchema_1.default.findById(targetUserId).select("_id isPublic").lean();
         if (!target) {
             return res.status(404).json({ message: "User not found" });
+        }
+        if (!target.isPublic) {
+            return res.status(403).json({ message: "User is private" });
         }
         const existing = await FollowSchema_1.default.findOne({ followerId, followingId: targetObjectId }).lean();
         if (existing) {
@@ -278,13 +281,14 @@ followRouter.get("/profile/all-followers", userAuth_1.default, async (req, res) 
             ...cursorFilter,
         })
             .sort({ createdAt: -1, _id: -1 })
-            .populate("followerId", "name emailId photoURL")
+            .populate("followerId", "name emailId photoURL isPublic")
             .limit(FOLLOW_PAGE_SIZE)
             .lean();
-        const results = followers.map((follow) => ({
+        const results = followers
+            .map((follow) => ({
             id: String(follow._id),
             createdAt: follow.createdAt,
-            follower: follow.followerId
+            follower: follow.followerId && follow.followerId.isPublic
                 ? {
                     _id: String(follow.followerId._id || ""),
                     name: follow.followerId.name,
@@ -292,7 +296,8 @@ followRouter.get("/profile/all-followers", userAuth_1.default, async (req, res) 
                     photoURL: follow.followerId.photoURL,
                 }
                 : null,
-        }));
+        }))
+            .filter((entry) => entry.follower !== null);
         const last = followers[followers.length - 1];
         const nextCursor = last && followers.length === FOLLOW_PAGE_SIZE
             ? encodeCursor({ createdAt: new Date(last.createdAt).toISOString(), id: String(last._id) })
@@ -339,13 +344,14 @@ followRouter.get("/profile/all-following", userAuth_1.default, async (req, res) 
             ...cursorFilter,
         })
             .sort({ createdAt: -1, _id: -1 })
-            .populate("followingId", "name emailId photoURL")
+            .populate("followingId", "name emailId photoURL isPublic")
             .limit(FOLLOW_PAGE_SIZE)
             .lean();
-        const results = following.map((follow) => ({
+        const results = following
+            .map((follow) => ({
             id: String(follow._id),
             createdAt: follow.createdAt,
-            following: follow.followingId
+            following: follow.followingId && follow.followingId.isPublic
                 ? {
                     _id: String(follow.followingId._id || ""),
                     name: follow.followingId.name,
@@ -353,7 +359,8 @@ followRouter.get("/profile/all-following", userAuth_1.default, async (req, res) 
                     photoURL: follow.followingId.photoURL,
                 }
                 : null,
-        }));
+        }))
+            .filter((entry) => entry.following !== null);
         const last = following[following.length - 1];
         const nextCursor = last && following.length === FOLLOW_PAGE_SIZE
             ? encodeCursor({ createdAt: new Date(last.createdAt).toISOString(), id: String(last._id) })

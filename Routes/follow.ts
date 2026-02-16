@@ -58,9 +58,12 @@ followRouter.post(
         return res.status(400).json({ message: "You cannot follow yourself" });
       }
 
-      const target = await User.findById(targetUserId).select("_id").lean();
+      const target = await User.findById(targetUserId).select("_id isPublic").lean();
       if (!target) {
         return res.status(404).json({ message: "User not found" });
+      }
+      if (!target.isPublic) {
+        return res.status(403).json({ message: "User is private" });
       }
 
       const existing = await Follow.findOne({ followerId, followingId: targetObjectId }).lean();
@@ -350,22 +353,25 @@ followRouter.get(
         ...cursorFilter,
       })
         .sort({ createdAt: -1, _id: -1 })
-        .populate("followerId", "name emailId photoURL")
+        .populate("followerId", "name emailId photoURL isPublic")
         .limit(FOLLOW_PAGE_SIZE)
         .lean();
 
-      const results = followers.map((follow) => ({
-        id: String(follow._id),
-        createdAt: follow.createdAt,
-        follower: follow.followerId
-          ? {
-              _id: String((follow.followerId as any)._id || ""),
-              name: (follow.followerId as any).name,
-              emailId: (follow.followerId as any).emailId,
-              photoURL: (follow.followerId as any).photoURL,
-            }
-          : null,
-      }));
+      const results = followers
+        .map((follow) => ({
+          id: String(follow._id),
+          createdAt: follow.createdAt,
+          follower:
+            follow.followerId && (follow.followerId as any).isPublic
+              ? {
+                  _id: String((follow.followerId as any)._id || ""),
+                  name: (follow.followerId as any).name,
+                  emailId: (follow.followerId as any).emailId,
+                  photoURL: (follow.followerId as any).photoURL,
+                }
+              : null,
+        }))
+        .filter((entry) => entry.follower !== null);
 
       const last = followers[followers.length - 1];
       const nextCursor = last && followers.length === FOLLOW_PAGE_SIZE
@@ -422,22 +428,25 @@ followRouter.get(
         ...cursorFilter,
       })
         .sort({ createdAt: -1, _id: -1 })
-        .populate("followingId", "name emailId photoURL")
+        .populate("followingId", "name emailId photoURL isPublic")
         .limit(FOLLOW_PAGE_SIZE)
         .lean();
 
-      const results = following.map((follow) => ({
-        id: String(follow._id),
-        createdAt: follow.createdAt,
-        following: follow.followingId
-          ? {
-              _id: String((follow.followingId as any)._id || ""),
-              name: (follow.followingId as any).name,
-              emailId: (follow.followingId as any).emailId,
-              photoURL: (follow.followingId as any).photoURL,
-            }
-          : null,
-      }));
+      const results = following
+        .map((follow) => ({
+          id: String(follow._id),
+          createdAt: follow.createdAt,
+          following:
+            follow.followingId && (follow.followingId as any).isPublic
+              ? {
+                  _id: String((follow.followingId as any)._id || ""),
+                  name: (follow.followingId as any).name,
+                  emailId: (follow.followingId as any).emailId,
+                  photoURL: (follow.followingId as any).photoURL,
+                }
+              : null,
+        }))
+        .filter((entry) => entry.following !== null);
 
       const last = following[following.length - 1];
       const nextCursor = last && following.length === FOLLOW_PAGE_SIZE

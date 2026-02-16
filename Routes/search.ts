@@ -26,20 +26,21 @@ searchRouter.get(
 
       const user = await User.findById(req.user._id)
         .select("recentSearches")
-        .populate("recentSearches.userId", "name emailId photoURL statusMessage")
+        .populate("recentSearches.userId", "name emailId photoURL statusMessage isPublic")
         .lean();
 
       const recent = (user?.recentSearches || []).map((entry) => ({
         searchedAt: entry.searchedAt,
-        user: entry.userId
-          ? {
-              _id: String((entry.userId as any)._id || ""),
-              name: (entry.userId as any).name,
-              emailId: (entry.userId as any).emailId,
-              photoURL: (entry.userId as any).photoURL,
-              statusMessage: (entry.userId as any).statusMessage,
-            }
-          : null,
+        user:
+          entry.userId && (entry.userId as any).isPublic
+            ? {
+                _id: String((entry.userId as any)._id || ""),
+                name: (entry.userId as any).name,
+                emailId: (entry.userId as any).emailId,
+                photoURL: (entry.userId as any).photoURL,
+                statusMessage: (entry.userId as any).statusMessage,
+              }
+            : null,
       }));
 
       return res.status(200).json({ recent });
@@ -74,6 +75,14 @@ searchRouter.post(
       }
 
       const targetObjectId = new Types.ObjectId(targetUserId);
+
+      const targetUser = await User.findById(targetObjectId)
+        .select("isPublic")
+        .lean();
+
+      if (!targetUser || !targetUser.isPublic) {
+        return res.status(200).json({ status: "ignored" });
+      }
 
       await User.updateOne(
         { _id: req.user._id },
@@ -184,7 +193,10 @@ searchRouter.get(
         MAX_SEARCH_LIMIT
       );
 
-      const baseFilter: Record<string, unknown> = { _id: { $ne: req.user._id } };
+      const baseFilter: Record<string, unknown> = {
+        _id: { $ne: req.user._id },
+        isPublic: true,
+      };
 
       const filter = rawQuery
         ? {

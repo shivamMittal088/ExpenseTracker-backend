@@ -60,10 +60,9 @@ const UserSchema = new mongoose_1.Schema({
         maxLength: 150,
         //   default : `Hi , I am ${name},`
     },
-    currency: {
-        type: String,
-        enum: ["INR"],
-        default: "INR",
+    isPublic: {
+        type: Boolean,
+        default: true,
     },
     monthlyIncome: {
         type: Number,
@@ -74,20 +73,6 @@ const UserSchema = new mongoose_1.Schema({
         type: Number,
         default: 0,
         min: 0,
-    },
-    currentStreak: {
-        type: Number,
-        default: 0,
-        min: 0,
-    },
-    longestStreak: {
-        type: Number,
-        default: 0,
-        min: 0,
-    },
-    lastStreakDate: {
-        type: Date,
-        default: null,
     },
     recentSearches: {
         type: [
@@ -104,16 +89,6 @@ const UserSchema = new mongoose_1.Schema({
             },
         ],
         default: [],
-    },
-    preferences: {
-        darkMode: {
-            type: Boolean,
-            default: true,
-        },
-        startWeekOnMonday: {
-            type: Boolean,
-            default: true,
-        },
     },
 }, { timestamps: true } // adds createdAt & updatedAt 
 );

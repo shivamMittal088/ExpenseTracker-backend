@@ -1,26 +1,16 @@
 import mongoose, { Schema, Document } from "mongoose";
 import Tiles from "./TilesSchema";
 
-type UserPreferences = {
-  darkMode: boolean;
-  startWeekOnMonday: boolean;
-};
-
-
 export interface IUser extends Document {
   name: string;
   emailId: string;
   password: string;
   photoURL?: string;
   statusMessage?: string;
-  currency: "INR";
+  isPublic: boolean;
   monthlyIncome: number;
   dailyBudget: number;
-  currentStreak: number;
-  longestStreak: number;
-  lastStreakDate: Date | null;
   recentSearches: { userId: Schema.Types.ObjectId; searchedAt: Date }[];
-  preferences: UserPreferences;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -57,10 +47,9 @@ const UserSchema = new Schema<IUser>(
     //   default : `Hi , I am ${name},`
     },
 
-    currency: {
-      type: String,
-      enum: ["INR"],
-      default: "INR",
+    isPublic: {
+      type: Boolean,
+      default: true,
     },
 
     monthlyIncome: {
@@ -73,23 +62,6 @@ const UserSchema = new Schema<IUser>(
       type: Number,
       default: 0,
       min: 0,
-    },
-
-    currentStreak: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-
-    longestStreak: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-
-    lastStreakDate: {
-      type: Date,
-      default: null,
     },
 
     recentSearches: {
@@ -108,20 +80,6 @@ const UserSchema = new Schema<IUser>(
       ],
       default: [],
     },
-
-    preferences: {
-    darkMode: {
-    type: Boolean,
-    default: true,
-    },
-
-    startWeekOnMonday: {
-    type: Boolean,
-    default: true,
-  },
-
-},
-
 
   },
   { timestamps: true } // adds createdAt & updatedAt 

@@ -7,7 +7,6 @@ const express_1 = __importDefault(require("express"));
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const UserSchema_1 = __importDefault(require("../Models/UserSchema"));
-const ExpenseSchema_1 = __importDefault(require("../Models/ExpenseSchema"));
 const FollowSchema_1 = __importDefault(require("../Models/FollowSchema"));
 const userAuth_1 = __importDefault(require("../Middlewares/userAuth"));
 const logger_1 = require("../utils/logger");
@@ -40,8 +39,6 @@ profileRouter.get("/profile/view", userAuth_1.default, async (req, res) => {
             ...profile,
             monthlyIncome: profile.monthlyIncome ?? 0,
             dailyBudget: profile.dailyBudget ?? 0,
-            currentStreak: profile.currentStreak ?? 0,
-            longestStreak: profile.longestStreak ?? 0,
             followersCount,
             followingCount,
         };
@@ -59,7 +56,7 @@ profileRouter.get("/profile/view", userAuth_1.default, async (req, res) => {
 /**
  * PATCH /profile/update
  * - Requires userAuth middleware to populate req.user
- * - Updates allowed fields: name, statusMessage, preferences
+ * - Updates allowed fields: name, statusMessage, monthlyIncome, dailyBudget
  */
 profileRouter.patch("/profile/update", userAuth_1.default, async (req, res) => {
     try {
@@ -67,15 +64,13 @@ profileRouter.patch("/profile/update", userAuth_1.default, async (req, res) => {
             return res.status(401).json({ message: "Not authenticated" });
         }
         const loggedInUserId = req.user._id;
-        const { name, statusMessage, preferences, monthlyIncome, dailyBudget } = req.body;
+        const { name, statusMessage, monthlyIncome, dailyBudget } = req.body;
         // Build update object with only allowed fields
         const updateData = {};
         if (name !== undefined)
             updateData.name = name;
         if (statusMessage !== undefined)
             updateData.statusMessage = statusMessage;
-        if (preferences !== undefined)
-            updateData.preferences = preferences;
         if (monthlyIncome !== undefined)
             updateData.monthlyIncome = monthlyIncome;
         if (dailyBudget !== undefined)
@@ -100,73 +95,35 @@ profileRouter.patch("/profile/update", userAuth_1.default, async (req, res) => {
     }
 });
 /**
- * GET /profile/streak
+ * PATCH /profile/privacy
  * - Requires userAuth middleware
- * - Returns user's streak data from DB (read-only)
- * - Streak updates are handled by cron job at 12 PM daily
- * - Only fetches today's spending for real-time display
+ * - Updates account privacy (isPublic)
  */
-profileRouter.get("/profile/streak", userAuth_1.default, async (req, res) => {
+profileRouter.patch("/profile/privacy", userAuth_1.default, async (req, res) => {
     try {
         if (!req.user) {
             return res.status(401).json({ message: "Not authenticated" });
         }
         const loggedInUserId = req.user._id;
-        // Get user's streak data from DB
-        const user = await UserSchema_1.default.findById(loggedInUserId)
-            .select("dailyBudget currentStreak longestStreak")
+        const { isPublic } = req.body;
+        if (typeof isPublic !== "boolean") {
+            return res.status(400).json({ message: "isPublic must be a boolean" });
+        }
+        const updatedProfile = await UserSchema_1.default.findByIdAndUpdate(loggedInUserId, { $set: { isPublic } }, { new: true, runValidators: true })
+            .select("-password")
             .lean();
-        if (!user) {
+        if (!updatedProfile) {
             return res.status(404).json({ message: "User not found" });
         }
-        const dailyBudget = user.dailyBudget || 0;
-        // If no daily budget is set, return zeros
-        if (dailyBudget <= 0) {
-            return res.status(200).json({
-                currentStreak: 0,
-                longestStreak: user.longestStreak || 0,
-                dailyBudget: 0,
-                todaySpent: 0,
-                todayUnderBudget: false,
-                remainingToday: 0,
-            });
-        }
-        // Get current 12 PM period for today's spending
-        const now = new Date();
-        const noon = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0, 0);
-        const currentPeriodStart = now.getHours() < 12
-            ? new Date(noon.getTime() - 24 * 60 * 60 * 1000) // Yesterday noon
-            : noon; // Today noon
-        const currentPeriodEnd = new Date(currentPeriodStart.getTime() + 24 * 60 * 60 * 1000);
-        // Get today's spending (real-time)
-        const todayExpenses = await ExpenseSchema_1.default.aggregate([
-            {
-                $match: {
-                    userId: loggedInUserId,
-                    deleted: { $ne: true },
-                    occurredAt: { $gte: currentPeriodStart, $lt: currentPeriodEnd },
-                },
-            },
-            {
-                $group: {
-                    _id: null,
-                    total: { $sum: "$amount" },
-                },
-            },
-        ]);
-        const todaySpent = todayExpenses[0]?.total || 0;
-        const todayUnderBudget = todaySpent <= dailyBudget;
-        return res.status(200).json({
-            currentStreak: user.currentStreak || 0,
-            longestStreak: user.longestStreak || 0,
-            dailyBudget,
-            todaySpent,
-            todayUnderBudget,
-            remainingToday: Math.max(0, dailyBudget - todaySpent),
+        (0, logger_1.logEvent)("info", "Privacy updated", {
+            route: "PATCH /profile/privacy",
+            userId: loggedInUserId,
+            isPublic,
         });
+        return res.status(200).json(updatedProfile);
     }
     catch (err) {
-        (0, logger_1.logApiError)(req, err, { route: "GET /profile/streak" });
+        (0, logger_1.logApiError)(req, err, { route: "PATCH /profile/privacy" });
         return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
 });
