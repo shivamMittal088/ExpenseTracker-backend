@@ -185,7 +185,6 @@ Set the `AXIOM_*` environment variables to enable. Falls back to console in deve
 ### Implemented
 - [x] Add expense with validation and payment mode normalization
 - [x] Fetch daily expenses by local date with timezone handling
-- [x] Soft hide/restore expenses via `deleted` flag
 - [x] Update expense fields (amount, category, notes, payment mode, occurredAt)
 - [x] Auth-protected routes using `userAuth` middleware
 - [x] Single-device login enforcement

@@ -7,7 +7,7 @@ import { logApiError, logEvent } from "../utils/logger";
 
 const authRouter = express.Router();
 
-const TOKEN_EXPIRY_MS = 1 * 60 * 60 * 1000; // 1 hour
+const TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // 1 day
 
 /* ---------- Signup ---------- */
 authRouter.post("/signup", async (req:  Request, res: Response) => {
@@ -32,7 +32,7 @@ authRouter.post("/signup", async (req:  Request, res: Response) => {
     const token = jwt.sign(
       { _id: savedUser._id },
       "MYSecretKey",
-      { expiresIn: "1h" }
+      { expiresIn: "1d" }
     );
 
     const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_MS);
@@ -79,7 +79,7 @@ authRouter.post("/login", async (req:  Request, res: Response) => {
     const token = jwt.sign(
       { _id: user._id },
       "MYSecretKey",
-      { expiresIn: "1h" }
+      { expiresIn: "1d" }
     );
 
     const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_MS);

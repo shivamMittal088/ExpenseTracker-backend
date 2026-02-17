@@ -50,11 +50,8 @@ profileRouter.get(
         Follow.countDocuments({ followerId: loggedInUserId, status: "accepted" }),
       ]);
 
-      // Ensure monthlyIncome has a default value for older users who don't have the field
       const profileWithDefaults = {
         ...profile,
-        monthlyIncome: profile.monthlyIncome ?? 0,
-        dailyBudget: profile.dailyBudget ?? 0,
         followersCount,
         followingCount,
       };
@@ -75,7 +72,7 @@ profileRouter.get(
 /**
  * PATCH /profile/update
  * - Requires userAuth middleware to populate req.user
- * - Updates allowed fields: name, statusMessage, monthlyIncome, dailyBudget
+ * - Updates allowed fields: name, statusMessage
  */
 profileRouter.patch(
   "/profile/update",
@@ -87,14 +84,12 @@ profileRouter.patch(
       }
 
       const loggedInUserId = req.user._id;
-      const { name, statusMessage, monthlyIncome, dailyBudget } = req.body;
+      const { name, statusMessage } = req.body;
 
       // Build update object with only allowed fields
       const updateData: Record<string, unknown> = {};
       if (name !== undefined) updateData.name = name;
       if (statusMessage !== undefined) updateData.statusMessage = statusMessage;
-      if (monthlyIncome !== undefined) updateData.monthlyIncome = monthlyIncome;
-      if (dailyBudget !== undefined) updateData.dailyBudget = dailyBudget;
 
       if (Object.keys(updateData).length === 0) {
         return res.status(400).json({ message: "No valid fields to update" });

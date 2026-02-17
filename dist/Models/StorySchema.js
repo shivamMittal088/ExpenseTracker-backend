@@ -34,54 +34,35 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = __importStar(require("mongoose"));
-const UserSchema = new mongoose_1.Schema({
-    name: {
+const StorySchema = new mongoose_1.Schema({
+    userId: {
+        type: mongoose_1.Schema.Types.ObjectId,
+        ref: "User",
+        required: true,
+        index: true,
+    },
+    mediaUrl: {
         type: String,
         required: true,
         trim: true,
-        minlength: 3,
     },
-    emailId: {
+    mediaType: {
         type: String,
-        required: true,
-        unique: true,
-        lowercase: true,
+        enum: ["image"],
+        default: "image",
+    },
+    caption: {
+        type: String,
         trim: true,
+        maxLength: 200,
     },
-    password: {
-        type: String,
+    expiresAt: {
+        type: Date,
         required: true,
+        index: true,
     },
-    photoURL: {
-        type: String,
-    },
-    statusMessage: {
-        type: String,
-        maxLength: 150,
-        //   default : `Hi , I am ${name},`
-    },
-    isPublic: {
-        type: Boolean,
-        default: true,
-    },
-    recentSearches: {
-        type: [
-            {
-                userId: {
-                    type: mongoose_1.Schema.Types.ObjectId,
-                    ref: "User",
-                    required: true,
-                },
-                searchedAt: {
-                    type: Date,
-                    default: Date.now,
-                },
-            },
-        ],
-        default: [],
-    },
-}, { timestamps: true } // adds createdAt & updatedAt 
-);
-// Support name/email lookups for search
-UserSchema.index({ name: "text", emailId: "text" });
-exports.default = mongoose_1.default.model("User", UserSchema);
+}, { timestamps: true });
+// Auto-delete stories once expired.
+StorySchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+StorySchema.index({ userId: 1, createdAt: -1 });
+exports.default = mongoose_1.default.model("Story", StorySchema);

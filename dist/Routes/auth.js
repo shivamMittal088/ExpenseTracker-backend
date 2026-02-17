@@ -10,7 +10,7 @@ const bcrypt_1 = __importDefault(require("bcrypt"));
 const userAuth_1 = __importDefault(require("../Middlewares/userAuth"));
 const logger_1 = require("../utils/logger");
 const authRouter = express_1.default.Router();
-const TOKEN_EXPIRY_MS = 1 * 60 * 60 * 1000; // 1 hour
+const TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // 1 day
 /* ---------- Signup ---------- */
 authRouter.post("/signup", async (req, res) => {
     try {
@@ -26,7 +26,7 @@ authRouter.post("/signup", async (req, res) => {
             password: hashPassword,
         });
         const savedUser = await newUser.save();
-        const token = jsonwebtoken_1.default.sign({ _id: savedUser._id }, "MYSecretKey", { expiresIn: "1h" });
+        const token = jsonwebtoken_1.default.sign({ _id: savedUser._id }, "MYSecretKey", { expiresIn: "1d" });
         const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_MS);
         res.cookie("token", token, {
             httpOnly: true,
@@ -59,7 +59,7 @@ authRouter.post("/login", async (req, res) => {
             return res.status(400).json({ message: "Invalid credentials" });
         }
         // Generate new token
-        const token = jsonwebtoken_1.default.sign({ _id: user._id }, "MYSecretKey", { expiresIn: "1h" });
+        const token = jsonwebtoken_1.default.sign({ _id: user._id }, "MYSecretKey", { expiresIn: "1d" });
         const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_MS);
         res.cookie("token", token, {
             httpOnly: true,

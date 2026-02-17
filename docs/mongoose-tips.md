@@ -70,28 +70,6 @@ allowedModes.has("UPI");  // Instant!
 
 ## Queries and Indexes
 
-### Soft Delete Pattern
-
-Instead of actually deleting documents, use a `deleted` flag:
-
-```typescript
-// Soft delete
-await Expense.findOneAndUpdate(
-  { _id: expenseId, userId },
-  { deleted: true }
-);
-
-// Query only non-deleted
-await Expense.find({ userId, deleted: false });
-
-// Query with options
-const includeHidden = req.query.includeHidden === "true";
-await Expense.find({
-  userId,
-  ...(includeHidden ? {} : { deleted: false })
-});
-```
-
 ### Date Range Queries
 
 ```typescript

@@ -8,8 +8,6 @@ export interface IUser extends Document {
   photoURL?: string;
   statusMessage?: string;
   isPublic: boolean;
-  monthlyIncome: number;
-  dailyBudget: number;
   recentSearches: { userId: Schema.Types.ObjectId; searchedAt: Date }[];
   createdAt: Date;
   updatedAt: Date;
@@ -50,18 +48,6 @@ const UserSchema = new Schema<IUser>(
     isPublic: {
       type: Boolean,
       default: true,
-    },
-
-    monthlyIncome: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-
-    dailyBudget: {
-      type: Number,
-      default: 0,
-      min: 0,
     },
 
     recentSearches: {

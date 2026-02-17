@@ -9,7 +9,6 @@ const ExpenseSchema_1 = __importDefault(require("../Models/ExpenseSchema"));
 const userAuth_1 = __importDefault(require("../Middlewares/userAuth"));
 const logger_1 = require("../utils/logger");
 const expressRouter = express_1.default.Router();
-const parseBool = (value) => value === true || value === "true" || value === "1" || value === 1;
 const EXPENSE_PAGE_SIZE = 30;
 const encodeExpenseCursor = (cursor) => Buffer.from(JSON.stringify(cursor), "utf8").toString("base64");
 const decodeExpenseCursor = (value) => {
@@ -113,15 +112,11 @@ expressRouter.get("/expense/:date", userAuth_1.default, async (req, res) => {
         // Create date range for the day
         const startOfDay = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0) + tzOffsetMinutes * 60 * 1000);
         const endOfDay = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999) + tzOffsetMinutes * 60 * 1000);
-        const includeHidden = parseBool(req.query.includeHidden);
-        const onlyHidden = parseBool(req.query.onlyHidden);
         const page = Math.max(1, parseInt(String(req.query.page || "1"), 10) || 1);
         const limit = Math.max(1, parseInt(String(req.query.limit || "8"), 10) || 8);
         const skip = (page - 1) * limit;
-        const deletedFilter = onlyHidden ? { deleted: true } : includeHidden ? {} : { deleted: { $ne: true } };
         const baseMatch = {
             userId: new mongoose_1.default.Types.ObjectId(userId),
-            ...deletedFilter,
         };
         const effectiveDateStages = [
             {
@@ -140,7 +135,7 @@ expressRouter.get("/expense/:date", userAuth_1.default, async (req, res) => {
                 },
             },
         ];
-        const [expenseTransactions, totals, hiddenCountResult] = await Promise.all([
+        const [expenseTransactions, totals] = await Promise.all([
             ExpenseSchema_1.default.aggregate([
                 { $match: baseMatch },
                 ...effectiveDateStages,
@@ -159,15 +154,9 @@ expressRouter.get("/expense/:date", userAuth_1.default, async (req, res) => {
                     },
                 },
             ]),
-            ExpenseSchema_1.default.aggregate([
-                { $match: { userId: new mongoose_1.default.Types.ObjectId(userId), deleted: true } },
-                ...effectiveDateStages,
-                { $group: { _id: null, totalCount: { $sum: 1 } } },
-            ]),
         ]);
         const totalCount = totals[0]?.totalCount || 0;
         const totalAmount = totals[0]?.totalAmount || 0;
-        const hiddenCount = hiddenCountResult[0]?.totalCount || 0;
         const totalPages = Math.max(1, Math.ceil(totalCount / limit));
         (0, logger_1.logEvent)("info", "Expense list fetched", {
             route: "GET /expense/:date",
@@ -187,7 +176,6 @@ expressRouter.get("/expense/:date", userAuth_1.default, async (req, res) => {
                 totalCount,
                 totalPages,
                 totalAmount,
-                hiddenCount,
             },
         });
     }
@@ -207,7 +195,6 @@ expressRouter.get("/expenses/paged", userAuth_1.default, async (req, res) => {
         }
         const baseFilter = {
             userId,
-            deleted: { $ne: true },
         };
         const cursorFilter = cursor
             ? {
@@ -245,54 +232,6 @@ expressRouter.get("/expenses/paged", userAuth_1.default, async (req, res) => {
     catch (err) {
         (0, logger_1.logApiError)(req, err, { route: "GET /expenses/paged" });
         return res.status(500).json({ message: "Failed to load expenses" });
-    }
-});
-// Soft hide / restore an expense
-expressRouter.patch("/expense/:expenseId/hide", userAuth_1.default, async (req, res) => {
-    try {
-        const { expenseId } = req.params;
-        const userId = req.user._id;
-        const { hide = true } = req.body ?? {};
-        if (!mongoose_1.default.isValidObjectId(expenseId)) {
-            (0, logger_1.logEvent)("warn", "Invalid expense id", {
-                route: "PATCH /expense/:expenseId/hide",
-                userId,
-                expenseId,
-            });
-            return res.status(400).json({ message: "Invalid expense id" });
-        }
-        if (typeof hide !== "boolean") {
-            (0, logger_1.logEvent)("warn", "Invalid hide flag", {
-                route: "PATCH /expense/:expenseId/hide",
-                userId,
-                expenseId,
-                hide,
-            });
-            return res.status(400).json({ message: "hide must be a boolean" });
-        }
-        const updated = await ExpenseSchema_1.default.findOneAndUpdate({ _id: expenseId, userId }, { deleted: hide }, { new: true });
-        if (!updated) {
-            (0, logger_1.logEvent)("warn", "Expense not found for hide/update", {
-                route: "PATCH /expense/:expenseId/hide",
-                userId,
-                expenseId,
-            });
-            return res.status(404).json({ message: "Expense not found" });
-        }
-        (0, logger_1.logEvent)("info", "Expense hide updated", {
-            route: "PATCH /expense/:expenseId/hide",
-            userId,
-            expenseId,
-            hidden: updated.deleted,
-        });
-        return res.status(200).json({
-            message: hide ? "Expense hidden" : "Expense restored",
-            data: updated,
-        });
-    }
-    catch (err) {
-        (0, logger_1.logApiError)(req, err, { route: "PATCH /expense/:expenseId/hide" });
-        return res.status(500).json({ message: "Failed to update expense" });
     }
 });
 // Update an expense (amount, category, notes, payment_mode, occurredAt)
@@ -422,7 +361,6 @@ expressRouter.get("/expenses/range", userAuth_1.default, async (req, res) => {
         }
         const expenses = await ExpenseSchema_1.default.find({
             userId,
-            deleted: false,
             occurredAt: {
                 $gte: start,
                 $lte: end,
@@ -458,7 +396,6 @@ expressRouter.get("/expenses/recurring", userAuth_1.default, async (req, res) =>
             {
                 $match: {
                     userId: new mongoose_1.default.Types.ObjectId(userId),
-                    deleted: { $ne: true },
                     occurredAt: { $gte: sixMonthsAgo },
                 },
             },
@@ -674,7 +611,6 @@ expressRouter.get("/expenses/payment-breakdown", userAuth_1.default, async (req,
             {
                 $match: {
                     userId: new mongoose_1.default.Types.ObjectId(userId),
-                    deleted: { $ne: true },
                     ...(period !== "all" && { occurredAt: { $gte: startDate } }),
                 },
             },
@@ -777,7 +713,6 @@ expressRouter.get("/expenses/spending-trends", userAuth_1.default, async (req, r
             {
                 $match: {
                     userId: new mongoose_1.default.Types.ObjectId(userId),
-                    deleted: { $ne: true },
                     occurredAt: { $gte: startDate },
                 },
             },
@@ -902,7 +837,6 @@ expressRouter.get("/expenses/heatmap/", userAuth_1.default, async (req, res) => 
             {
                 $match: {
                     userId: new mongoose_1.default.Types.ObjectId(userId),
-                    deleted: { $ne: true },
                 },
             },
             {

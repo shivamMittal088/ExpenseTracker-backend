@@ -48,11 +48,6 @@ const ExpenseSchema = new Schema({
     occurredAt: {
         type: Date,
         default: Date.now
-    },
-    // soft-delete flag
-    deleted: {
-        type: Boolean,
-        default: false
     }
 }, { timestamps: true });
 /* Indexes for typical queries */

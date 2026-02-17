@@ -148,7 +148,6 @@ seedRouter.post("/seed/recurring-expenses", userAuth, async (req: Request, res: 
           payment_mode: pattern.payment_mode,
           occurredAt: date,
           notes: `Test recurring - ${pattern.name}`,
-          deleted: false,
         });
       }
     }
@@ -279,7 +278,6 @@ seedRouter.post("/seed/transactions", userAuth, async (req: Request, res: Respon
         payment_mode,
         occurredAt,
         notes: `Seeded transaction ${index + 1}`,
-        deleted: false,
       };
     });
 
