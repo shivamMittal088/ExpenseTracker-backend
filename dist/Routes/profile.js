@@ -11,6 +11,7 @@ const FollowSchema_1 = __importDefault(require("../Models/FollowSchema"));
 const userAuth_1 = __importDefault(require("../Middlewares/userAuth"));
 const logger_1 = require("../utils/logger");
 const multer_1 = require("../config/multer");
+const cloudinaryClient_1 = require("../config/cloudinaryClient");
 const profileRouter = express_1.default.Router();
 /**
  * GET /profile
@@ -180,8 +181,33 @@ profileRouter.post("/profile/upload-avatar", userAuth_1.default, multer_1.avatar
         const loggedInUserId = req.user._id;
         // Get the old photo URL to delete the old file
         const oldUser = await UserSchema_1.default.findById(loggedInUserId).select("photoURL").lean();
-        // Build the photo URL (relative path that will be served statically)
-        const photoURL = `/uploads/avatars/${req.file.filename}`;
+        if (!cloudinaryClient_1.isCloudinaryEnabled) {
+            return res.status(500).json({ message: "Cloudinary is not configured" });
+        }
+        const publicId = `avatars/${loggedInUserId}/${Date.now()}`;
+        let uploadResult;
+        if (req.file?.buffer) {
+            uploadResult = await new Promise((resolve, reject) => {
+                const stream = cloudinaryClient_1.cloudinaryClient.uploader.upload_stream({
+                    public_id: publicId,
+                    resource_type: "image",
+                }, (error, result) => {
+                    if (error || !result?.secure_url) {
+                        reject(error || new Error("Cloudinary upload failed"));
+                        return;
+                    }
+                    resolve({ secure_url: result.secure_url });
+                });
+                stream.end(req.file?.buffer);
+            });
+        }
+        else {
+            uploadResult = await cloudinaryClient_1.cloudinaryClient.uploader.upload(req.file.path, {
+                public_id: publicId,
+                resource_type: "image",
+            });
+        }
+        const photoURL = uploadResult.secure_url;
         // Update user's photoURL in database
         const updatedProfile = await UserSchema_1.default.findByIdAndUpdate(loggedInUserId, { $set: { photoURL } }, { new: true, runValidators: true }).select("-password").lean();
         if (!updatedProfile) {
@@ -189,12 +215,16 @@ profileRouter.post("/profile/upload-avatar", userAuth_1.default, multer_1.avatar
             fs_1.default.unlinkSync(req.file.path);
             return res.status(404).json({ message: "User not found" });
         }
-        // Delete old avatar file if it exists
+        // Delete old avatar file if it exists (local only)
         if (oldUser?.photoURL && oldUser.photoURL.startsWith("/uploads/avatars/")) {
             const oldFilePath = path_1.default.join(__dirname, "..", oldUser.photoURL);
             if (fs_1.default.existsSync(oldFilePath)) {
                 fs_1.default.unlinkSync(oldFilePath);
             }
+        }
+        // Clean up local upload after Cloudinary upload.
+        if (req.file?.path && fs_1.default.existsSync(req.file.path)) {
+            fs_1.default.unlinkSync(req.file.path);
         }
         (0, logger_1.logEvent)("info", "Avatar uploaded", {
             route: "POST /profile/upload-avatar",

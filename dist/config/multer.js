@@ -17,24 +17,8 @@ const uploadsDir = isVercel
 if (!isVercel && !fs_1.default.existsSync(uploadsDir)) {
     fs_1.default.mkdirSync(uploadsDir, { recursive: true });
 }
-// For Vercel, use memory storage (files stored in buffer, not disk)
-// For local dev, use disk storage
-const storage = isVercel
-    ? multer_1.default.memoryStorage()
-    : multer_1.default.diskStorage({
-        destination: (_req, _file, cb) => {
-            // Create /tmp/avatars on Vercel if needed
-            if (!fs_1.default.existsSync(uploadsDir)) {
-                fs_1.default.mkdirSync(uploadsDir, { recursive: true });
-            }
-            cb(null, uploadsDir);
-        },
-        filename: (req, _file, cb) => {
-            const userId = req.user?._id || "unknown";
-            const ext = path_1.default.extname(_file.originalname).toLowerCase() || ".jpg";
-            cb(null, `${userId}-${Date.now()}${ext}`);
-        },
-    });
+// Always use memory storage for Cloudinary uploads
+const storage = multer_1.default.memoryStorage();
 // File filter for image uploads
 const fileFilter = (_req, file, cb) => {
     const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"];

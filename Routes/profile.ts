@@ -7,6 +7,7 @@ import userAuth from "../Middlewares/userAuth";
 import { IUser } from "../Models/UserSchema";
 import { logApiError, logEvent } from "../utils/logger";
 import { avatarUpload as upload } from "../config/multer";
+import { cloudinaryClient, isCloudinaryEnabled } from "../config/cloudinaryClient";
 
 
 declare global {
@@ -241,8 +242,38 @@ profileRouter.post(
       // Get the old photo URL to delete the old file
       const oldUser = await User.findById(loggedInUserId).select("photoURL").lean();
       
-      // Build the photo URL (relative path that will be served statically)
-      const photoURL = `/uploads/avatars/${req.file.filename}`;
+      if (!isCloudinaryEnabled) {
+        return res.status(500).json({ message: "Cloudinary is not configured" });
+      }
+
+      const publicId = `avatars/${loggedInUserId}/${Date.now()}`;
+      let uploadResult;
+
+      if (req.file?.buffer) {
+        uploadResult = await new Promise<{ secure_url: string }>((resolve, reject) => {
+          const stream = cloudinaryClient.uploader.upload_stream(
+            {
+              public_id: publicId,
+              resource_type: "image",
+            },
+            (error: Error | undefined, result: { secure_url?: string } | undefined) => {
+              if (error || !result?.secure_url) {
+                reject(error || new Error("Cloudinary upload failed"));
+                return;
+              }
+              resolve({ secure_url: result.secure_url });
+            }
+          );
+          stream.end(req.file?.buffer);
+        });
+      } else {
+        uploadResult = await cloudinaryClient.uploader.upload(req.file.path, {
+          public_id: publicId,
+          resource_type: "image",
+        });
+      }
+
+      const photoURL = uploadResult.secure_url;
 
       // Update user's photoURL in database
       const updatedProfile = await User.findByIdAndUpdate(
@@ -257,12 +288,17 @@ profileRouter.post(
         return res.status(404).json({ message: "User not found" });
       }
 
-      // Delete old avatar file if it exists
+      // Delete old avatar file if it exists (local only)
       if (oldUser?.photoURL && oldUser.photoURL.startsWith("/uploads/avatars/")) {
         const oldFilePath = path.join(__dirname, "..", oldUser.photoURL);
         if (fs.existsSync(oldFilePath)) {
           fs.unlinkSync(oldFilePath);
         }
+      }
+
+      // Clean up local upload after Cloudinary upload.
+      if (req.file?.path && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
       }
 
       logEvent("info", "Avatar uploaded", {

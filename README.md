@@ -55,6 +55,16 @@ NODE_ENV=development
 AXIOM_TOKEN=your-axiom-api-token
 AXIOM_ORG_ID=your-org-id
 AXIOM_DATASET=expense-tracker
+
+# Optional: Cloudinary (profile photos in production)
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+
+# Optional: Cloudinary (profile photos in production)
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
 ```
 
 ### Running Locally
