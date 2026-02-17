@@ -10,11 +10,29 @@ interface AuthRequest extends Request {
   user: IUser;
 }
 
+  const DEFAULT_TILES = [
+    { name: "Food", emoji: "\uD83C\uDF54", color: "#F97316", isBuiltIn: true },
+    { name: "Travel", emoji: "\uD83D\uDE95", color: "#3B82F6", isBuiltIn: true },
+    { name: "Bills", emoji: "\uD83D\uDCA1", color: "#F59E0B", isBuiltIn: true },
+    { name: "Shopping", emoji: "\uD83D\uDECD\uFE0F", color: "#EC4899", isBuiltIn: true },
+    { name: "Health", emoji: "\uD83D\uDC8A", color: "#22C55E", isBuiltIn: true }
+  ];
+
 // Get all tiles for the current user
 tileRouter.get("/tiles", userAuth ,async (req:Request, res:Response) => {
   try {
      const authReq = req as AuthRequest; // 👈 cast here
     const userId = authReq.user._id;
+
+    const builtInCount = await Tiles.countDocuments({ isBuiltIn: true });
+    if (builtInCount === 0) {
+      await Tiles.insertMany(DEFAULT_TILES, { ordered: false });
+      logEvent("info", "Default tiles auto-seeded", {
+        route: "GET /tiles",
+        userId,
+        count: DEFAULT_TILES.length,
+      });
+    }
 
     const tiles = await Tiles.find({
       $or: [

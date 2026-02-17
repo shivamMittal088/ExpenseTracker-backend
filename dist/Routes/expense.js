@@ -101,29 +101,94 @@ expressRouter.post("/expense/add", userAuth_1.default, async (req, res, next) =>
 expressRouter.get("/expense/:date", userAuth_1.default, async (req, res) => {
     try {
         const userId = req.user._id;
-        const rawDate = req.params.date;
+        const rawDate = Array.isArray(req.params.date)
+            ? req.params.date[0]
+            : req.params.date;
+        const dateParts = rawDate.split("-").map((part) => Number(part));
+        if (dateParts.length !== 3 || dateParts.some((part) => Number.isNaN(part))) {
+            return res.status(400).json({ message: "Invalid date format" });
+        }
+        const [year, month, day] = dateParts;
+        const tzOffsetMinutes = parseInt(String(req.query.tzOffsetMinutes || "0"), 10) || 0;
         // Create date range for the day
-        const startOfDay = new Date(rawDate + "T00:00:00.000Z");
-        const endOfDay = new Date(rawDate + "T23:59:59.999Z");
+        const startOfDay = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0) + tzOffsetMinutes * 60 * 1000);
+        const endOfDay = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999) + tzOffsetMinutes * 60 * 1000);
         const includeHidden = parseBool(req.query.includeHidden);
         const onlyHidden = parseBool(req.query.onlyHidden);
-        const expenseTransactions = await ExpenseSchema_1.default.find({
-            userId,
-            ...(onlyHidden ? { deleted: true } : includeHidden ? {} : { deleted: false }),
-            occurredAt: {
-                $gte: startOfDay,
-                $lte: endOfDay,
+        const page = Math.max(1, parseInt(String(req.query.page || "1"), 10) || 1);
+        const limit = Math.max(1, parseInt(String(req.query.limit || "8"), 10) || 8);
+        const skip = (page - 1) * limit;
+        const deletedFilter = onlyHidden ? { deleted: true } : includeHidden ? {} : { deleted: { $ne: true } };
+        const baseMatch = {
+            userId: new mongoose_1.default.Types.ObjectId(userId),
+            ...deletedFilter,
+        };
+        const effectiveDateStages = [
+            {
+                $addFields: {
+                    effectiveOccurredAt: {
+                        $ifNull: ["$occurredAt", { $ifNull: ["$occuredAt", "$createdAt"] }],
+                    },
+                },
             },
-        }).sort({ occurredAt: -1 });
+            {
+                $match: {
+                    effectiveOccurredAt: {
+                        $gte: startOfDay,
+                        $lte: endOfDay,
+                    },
+                },
+            },
+        ];
+        const [expenseTransactions, totals, hiddenCountResult] = await Promise.all([
+            ExpenseSchema_1.default.aggregate([
+                { $match: baseMatch },
+                ...effectiveDateStages,
+                { $sort: { effectiveOccurredAt: -1, _id: -1 } },
+                { $skip: skip },
+                { $limit: limit },
+            ]),
+            ExpenseSchema_1.default.aggregate([
+                { $match: baseMatch },
+                ...effectiveDateStages,
+                {
+                    $group: {
+                        _id: null,
+                        totalCount: { $sum: 1 },
+                        totalAmount: { $sum: "$amount" },
+                    },
+                },
+            ]),
+            ExpenseSchema_1.default.aggregate([
+                { $match: { userId: new mongoose_1.default.Types.ObjectId(userId), deleted: true } },
+                ...effectiveDateStages,
+                { $group: { _id: null, totalCount: { $sum: 1 } } },
+            ]),
+        ]);
+        const totalCount = totals[0]?.totalCount || 0;
+        const totalAmount = totals[0]?.totalAmount || 0;
+        const hiddenCount = hiddenCountResult[0]?.totalCount || 0;
+        const totalPages = Math.max(1, Math.ceil(totalCount / limit));
         (0, logger_1.logEvent)("info", "Expense list fetched", {
             route: "GET /expense/:date",
             userId,
             count: expenseTransactions.length,
             date: rawDate,
+            page,
+            limit,
+            totalCount,
         });
         return res.json({
             message: "Expense list successfully fetched",
             data: expenseTransactions,
+            meta: {
+                page,
+                limit,
+                totalCount,
+                totalPages,
+                totalAmount,
+                hiddenCount,
+            },
         });
     }
     catch (err) {
@@ -824,22 +889,32 @@ expressRouter.get("/expenses/heatmap/", userAuth_1.default, async (req, res) => 
     try {
         const userId = req.user._id;
         const { year } = req.query;
-        // Default to current year if not provided
         const targetYear = year ? parseInt(year) : new Date().getFullYear();
-        // Use IST timezone for date boundaries (UTC+5:30)
-        // IST midnight = UTC 18:30 previous day
-        const IST_OFFSET_HOURS = 5.5;
-        // Start of year in IST (Jan 1 00:00 IST = Dec 31 18:30 UTC previous year)
-        const startDate = new Date(Date.UTC(targetYear - 1, 11, 31, 18, 30, 0, 0));
-        // End of year in IST (Dec 31 23:59:59 IST = Dec 31 18:29:59 UTC)
-        const endDate = new Date(Date.UTC(targetYear, 11, 31, 18, 29, 59, 999));
-        // Aggregate to get count of transactions per day
+        const tzOffsetMinutes = parseInt(String(req.query.tzOffsetMinutes || "0"), 10) || 0;
+        const tzSign = tzOffsetMinutes <= 0 ? "+" : "-";
+        const tzAbs = Math.abs(tzOffsetMinutes);
+        const tzHours = String(Math.floor(tzAbs / 60)).padStart(2, "0");
+        const tzMinutes = String(tzAbs % 60).padStart(2, "0");
+        const tzString = `${tzSign}${tzHours}:${tzMinutes}`;
+        const startDate = new Date(Date.UTC(targetYear, 0, 1, 0, 0, 0, 0) + tzOffsetMinutes * 60 * 1000);
+        const endDate = new Date(Date.UTC(targetYear, 11, 31, 23, 59, 59, 999) + tzOffsetMinutes * 60 * 1000);
         const heatmapData = await ExpenseSchema_1.default.aggregate([
             {
                 $match: {
                     userId: new mongoose_1.default.Types.ObjectId(userId),
                     deleted: { $ne: true },
-                    occurredAt: {
+                },
+            },
+            {
+                $addFields: {
+                    effectiveOccurredAt: {
+                        $ifNull: ["$occurredAt", { $ifNull: ["$occuredAt", "$createdAt"] }],
+                    },
+                },
+            },
+            {
+                $match: {
+                    effectiveOccurredAt: {
                         $gte: startDate,
                         $lte: endDate,
                     },
@@ -848,11 +923,10 @@ expressRouter.get("/expenses/heatmap/", userAuth_1.default, async (req, res) => 
             {
                 $group: {
                     _id: {
-                        // Convert to IST by adding 5:30 hours, then format as date
                         $dateToString: {
                             format: "%Y-%m-%d",
-                            date: "$occurredAt",
-                            timezone: "+05:30" // IST timezone
+                            date: "$effectiveOccurredAt",
+                            timezone: tzString,
                         },
                     },
                     count: { $sum: 1 },

@@ -50,8 +50,8 @@ FollowSchema.index({ followerId: 1, followingId: 1 }, { unique: true });
 FollowSchema.pre(
   ["find", "findOne", "findOneAndUpdate", "findOneAndDelete"],
   function (this: any) {
-    this.populate({ path: "followerId", select: "name emailId photoURL" });
-    this.populate({ path: "followingId", select: "name emailId photoURL" });
+    this.populate({ path: "followerId", select: "name emailId photoURL isPublic" });
+    this.populate({ path: "followingId", select: "name emailId photoURL isPublic" });
   }
 );
 
