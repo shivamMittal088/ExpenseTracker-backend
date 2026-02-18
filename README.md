@@ -139,16 +139,7 @@ Server runs at `http://localhost:5000`
 | GET | `/api/tiles` | Get category tiles |
 | POST | `/api/tiles/add` | Create tile |
 | DELETE | `/api/tiles/remove/:id` | Delete tile |
-
-### Seed (Testing)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
 | POST | `/api/seed/tiles` | Seed default tiles |
-| POST | `/api/seed/recurring-expenses` | Seed recurring expenses |
-| DELETE | `/api/seed/recurring-expenses` | Remove recurring expenses |
-| POST | `/api/seed/followers` | Seed followers |
-| POST | `/api/seed/transactions` | Seed transactions |
 
 ## Authentication
 
