@@ -50,16 +50,12 @@ Create a `.env` file in the Backend folder:
 PORT=5000
 MONGODB_URI=mongodb://localhost:27017/expense-tracker
 NODE_ENV=development
+FRONTEND_ORIGIN=http://localhost:5173
 
 # Optional: Axiom logging
 AXIOM_TOKEN=your-axiom-api-token
 AXIOM_ORG_ID=your-org-id
 AXIOM_DATASET=expense-tracker
-
-# Optional: Cloudinary (profile photos in production)
-CLOUDINARY_CLOUD_NAME=your_cloud_name
-CLOUDINARY_API_KEY=your_api_key
-CLOUDINARY_API_SECRET=your_api_secret
 
 # Optional: Cloudinary (profile photos in production)
 CLOUDINARY_CLOUD_NAME=your_cloud_name
@@ -98,25 +94,35 @@ Server runs at `http://localhost:5000`
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/expense` | Add new expense |
-| GET | `/api/expenses` | Get expenses (with filters) |
-| GET | `/api/expenses/range` | Get expenses in a date range |
+| POST | `/api/expense/add` | Add new expense |
+| GET | `/api/expense/:date` | Get expenses for a local date (YYYY-MM-DD) |
 | GET | `/api/expenses/paged` | Cursor-paginated expenses |
+| PATCH | `/api/expense/:expenseId` | Update expense |
+| GET | `/api/expenses/range` | Get expenses in a date range |
 | GET | `/api/expenses/recurring` | Recurring expense insights |
 | GET | `/api/expenses/payment-breakdown` | Payment mode breakdown |
 | GET | `/api/expenses/spending-trends` | Spending trends data |
-| PATCH | `/api/expense/:id` | Update expense |
-| DELETE | `/api/expense/:id` | Soft delete expense |
+| GET | `/api/expenses/heatmap` | Heatmap data by year |
 
-### Profile & Tiles
+### Profile
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/profile/view` | Get user profile |
-| GET | `/api/profile/streak` | Get streak data |
-| GET | `/api/profile/search-users` | Search other users by name/email |
-| GET | `/api/profile/user/:userId` | Get minimal public profile |
+| PATCH | `/api/profile/update` | Update profile (name, statusMessage) |
+| PATCH | `/api/profile/privacy` | Update privacy (`isPublic`) |
+| GET | `/api/profile/user/:userId` | Get public profile summary |
 | POST | `/api/profile/upload-avatar` | Upload profile avatar |
+| GET | `/api/profile/recent-searches` | Recent searches list |
+| POST | `/api/profile/recent-searches` | Add to recent searches |
+| DELETE | `/api/profile/recent-searches` | Clear recent searches |
+| DELETE | `/api/profile/recent-searches/:userId` | Remove one recent search |
+| GET | `/api/profile/search-users` | Search users by name/email/status |
+
+### Follow
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
 | GET | `/api/profile/follow-status/:userId` | Follow status for a user |
 | POST | `/api/profile/follow/:userId` | Send follow request |
 | DELETE | `/api/profile/follow/:userId` | Cancel/unfollow |
@@ -125,8 +131,14 @@ Server runs at `http://localhost:5000`
 | DELETE | `/api/profile/follow-requests/:requestId` | Decline follow request |
 | GET | `/api/profile/all-followers` | Cursor-paginated followers |
 | GET | `/api/profile/all-following` | Cursor-paginated following |
+
+### Tiles
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
 | GET | `/api/tiles` | Get category tiles |
-| POST | `/api/tile` | Create tile |
+| POST | `/api/tiles/add` | Create tile |
+| DELETE | `/api/tiles/remove/:id` | Delete tile |
 
 ### Seed (Testing)
 
@@ -143,7 +155,7 @@ Server runs at `http://localhost:5000`
 The API uses JWT tokens stored in HTTP-only cookies:
 
 - **Development:** `sameSite: "lax"`, `secure: false`
-- **Production:** `sameSite: "none"`, `secure: true`
+- **Production:** `sameSite: "lax"`, `secure: true`
 
 This allows cross-origin requests from the frontend.
 
@@ -163,9 +175,13 @@ Set the `AXIOM_*` environment variables to enable. Falls back to console in deve
 3. Set environment variables:
    - `MONGODB_URI`
    - `NODE_ENV=production`
+   - `FRONTEND_ORIGIN`
    - `AXIOM_TOKEN` (optional)
    - `AXIOM_ORG_ID` (optional)
    - `AXIOM_DATASET` (optional)
+   - `CLOUDINARY_CLOUD_NAME` (optional)
+   - `CLOUDINARY_API_KEY` (optional)
+   - `CLOUDINARY_API_SECRET` (optional)
 
 ---
 
@@ -175,28 +191,24 @@ Set the `AXIOM_*` environment variables to enable. Falls back to console in deve
 - [ ] Notification feature
 - [ ] Streak tracking
 - [ ] Badges support
-- [ ] Multi-language support
-- [ ] Private accounts
-- [ ] Following feature
+- [ ] Story addition with gallery support
 - [ ] PWA support
-- [ ] Recurring expenses
 - [ ] Export expenses (CSV/PDF)
 
 ### Implemented
 - [x] Add expense with validation and payment mode normalization
 - [x] Fetch daily expenses by local date with timezone handling
-- [x] Update expense fields (amount, category, notes, payment mode, occurredAt)
-- [x] Auth-protected routes using `userAuth` middleware
-- [x] Single-device login enforcement
-- [x] Session token management with expiry
-- [x] User signup with password hashing (bcrypt)
-- [x] User login with JWT HTTP-only cookies
-- [x] Password update with session invalidation
-- [x] User profile view and update (name, statusMessage, preferences)
-- [x] Login history tracking (IP, browser, OS, device)
-- [x] Category tiles (CRUD) with built-in and user-created tiles
-- [x] Follow system with requests and cursor-paginated lists
 - [x] Cursor pagination for expenses and followers
-- [x] Analytics insights (payment breakdown, trends, recurring)
+- [x] Recurring expense insights and spending analytics
+- [x] Auth-protected routes using `userAuth` middleware
+- [x] Session token management with 1-day expiry
+- [x] User signup/login with JWT HTTP-only cookies
+- [x] Password update with session invalidation
+- [x] User profile view/update and privacy toggle (`isPublic`)
+- [x] Profile avatar upload (Cloudinary)
+- [x] Category tiles (built-in + user-created)
+- [x] Follow system with requests and cursor-paginated lists
+- [x] Recent searches and user search
 - [x] Axiom logging integration for production monitoring
 - [x] Request/error logging with user context
+- [x] Lazy loading at route and component level to improve Lighthouse score
