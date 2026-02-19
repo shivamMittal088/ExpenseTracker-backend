@@ -1,10 +1,6 @@
 <div align="center">
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../frontend/public/logo.svg">
-  <source media="(prefers-color-scheme: light)" srcset="../frontend/public/logo.svg">
-  <img src="../frontend/public/logo.svg" alt="Expense Tracker" width="320"/>
-</picture>
+<img src="./docs/images/readme-banner-small.svg" alt="Expense Tracker Banner" width="760"/>
 
 ### Track expenses smarter. Analyze trends faster. Scale social features securely.
 
@@ -186,7 +182,10 @@ npm start
 npx nodemon dist/src/server.js
 ```
 
-Server default: `http://localhost:5000`
+Local URLs:
+
+- Frontend app: `http://localhost:5173`
+- Backend API: `http://localhost:5000`
 
 ---
 

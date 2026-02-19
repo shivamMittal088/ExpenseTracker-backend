@@ -1,0 +1,16 @@
+<svg width="1200" height="210" viewBox="0 0 1200 210" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="210" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0B3B8A"/>
+      <stop offset="0.55" stop-color="#155EEF"/>
+      <stop offset="1" stop-color="#1D4ED8"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="210" rx="20" fill="url(#bg)"/>
+  <circle cx="140" cy="45" r="78" fill="#93C5FD" fill-opacity="0.22"/>
+  <circle cx="1060" cy="48" r="84" fill="#BFDBFE" fill-opacity="0.18"/>
+
+  <text x="600" y="100" text-anchor="middle" fill="#F8FAFC" font-family="Segoe Script, Brush Script MT, Lucida Handwriting, cursive" font-size="62" font-weight="700">Expense Tracker</text>
+  <text x="600" y="152" text-anchor="middle" fill="#E0ECFF" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="30" font-weight="600">Track smarter • Spend wiser</text>
+</svg>
