@@ -21,6 +21,7 @@
 ## 🌐 Live Deployment
 
 - **Project URL:** [https://www.track-expense.com/](https://www.track-expense.com/)
+- **Frontend Repository:** [https://github.com/shivamMittal088/Expense-Tracker](https://github.com/shivamMittal088/Expense-Tracker)
 
 ---
 
@@ -65,15 +66,24 @@ Built for production-style usage with clean route structure, secure auth flows, 
 ### 📈 Analytics → 💸 Transactions
 
 <p align="center">
-  <img src="./expense-tracker-screenshot/mobile-analytics-1.png" width="240" alt="Mobile Analytics 1"/>
+  <img src="./expense-tracker-screenshot/mobile-analytics-1.png" width="220" alt="Mobile Analytics 1"/>
   &nbsp;&nbsp;&nbsp;
-  <img src="./expense-tracker-screenshot/mobile-analytics-2.png" width="240" alt="Mobile Analytics 2"/>
-</p>
-<p align="center">
-  <img src="./expense-tracker-screenshot/mobile-transactions.png" width="240" alt="Mobile Transactions"/>
+  <img src="./expense-tracker-screenshot/mobile-analytics-2.png" width="220" alt="Mobile Analytics 2"/>
+  &nbsp;&nbsp;&nbsp;
+  <img src="./expense-tracker-screenshot/mobile-transactions.png" width="220" alt="Mobile Transactions"/>
 </p>
 
 > Advanced insights with trend visualizations and paginated transaction views.
+
+---
+
+### 🪵 Axiom Logging
+
+<p align="center">
+  <img src="./expense-tracker-screenshot/mobile-axiom-logging.png" width="920" alt="Axiom Logging Dashboard"/>
+</p>
+
+> Real-time API observability with structured event logs, response status tracking, and performance metrics.
 
 ---
 
