@@ -32,16 +32,14 @@ Built for production-style usage with clean route structure, secure auth flows, 
 
 ---
 
-## 🎯 Use of this Project
+## 🧠 Engineering Insights
 
-This project is useful when you want to:
-
-- build a full-stack expense tracker with secure session handling
-- implement social features like follow requests and public profiles
-- support analytics-driven financial insights (heatmaps, trends, recurring patterns)
-- handle profile photo uploads securely with Multer + Cloudinary
-- implement scalable feed/list APIs using cursor pagination
-- export filtered expense data to Excel for reporting/records
+- Implemented **session-based authentication** with **centralized logging** for API monitoring and error tracking.
+- Built scalable followers APIs using **cursor-based pagination** with **infinite scroll** and **private account handling**.
+- Optimized frontend performance using **route/component lazy loading** and **modal prefetching**, reducing bundle size and improving **Lighthouse scores**.
+- Enhanced efficiency by **debouncing frequent state updates** to minimize redundant API calls and configured secure profile photo uploads using **Multer + Cloudinary** storage.
+- Built **data-driven APIs** for recurring payments, expense history, advanced filtering, and spending trend analysis, including an interactive **expense heatmap** for financial insights.
+- Added **Excel summary transactions download support** with **date-range filtering** for reporting workflows.
 
 ---
 
@@ -50,14 +48,14 @@ This project is useful when you want to:
 ### 🏠 Home → Quick Actions
 
 <p align="center">
-  <img src="./docs/images/mobile-home.png" width="230" alt="Mobile Home"/>
+  <img src="./expense-tracker-screenshot/mobile-home.png" width="230" alt="Mobile Home"/>
   &nbsp;&nbsp;&nbsp;
-  <img src="./docs/images/mobile-home-2.png" width="230" alt="Mobile Home 2"/>
+  <img src="./expense-tracker-screenshot/mobile-home-4.png" width="230" alt="Mobile Home 4"/>
 </p>
 <p align="center">
-  <img src="./docs/images/mobile-home-3.png" width="230" alt="Mobile Home 3"/>
+  <img src="./expense-tracker-screenshot/mobile-add-expense-1.png" width="230" alt="Mobile Add Expense 1"/>
   &nbsp;&nbsp;&nbsp;
-  <img src="./docs/images/mobile-home-4.png" width="230" alt="Mobile Home 4"/>
+  <img src="./expense-tracker-screenshot/mobile-add-expense-2.png" width="230" alt="Mobile Add Expense 2"/>
 </p>
 
 > **Left/Right:** Streamlined home experience with quick add and activity-focused layout.
@@ -67,12 +65,12 @@ This project is useful when you want to:
 ### 📈 Analytics → 💸 Transactions
 
 <p align="center">
-  <img src="./docs/images/mobile-analytics.png" width="240" alt="Mobile Analytics"/>
+  <img src="./expense-tracker-screenshot/mobile-analytics-1.png" width="240" alt="Mobile Analytics 1"/>
   &nbsp;&nbsp;&nbsp;
-  <img src="./docs/images/mobile-analytics-2.png" width="240" alt="Mobile Analytics 2"/>
+  <img src="./expense-tracker-screenshot/mobile-analytics-2.png" width="240" alt="Mobile Analytics 2"/>
 </p>
 <p align="center">
-  <img src="./docs/images/mobile-transactions.png" width="240" alt="Mobile Transactions"/>
+  <img src="./expense-tracker-screenshot/mobile-transactions.png" width="240" alt="Mobile Transactions"/>
 </p>
 
 > Advanced insights with trend visualizations and paginated transaction views.
@@ -82,14 +80,14 @@ This project is useful when you want to:
 ### 👤 Profile → 📤 Export
 
 <p align="center">
-  <img src="./docs/images/mobile-profile.png" width="220" alt="Mobile Profile"/>
+  <img src="./expense-tracker-screenshot/mobile-profile.png" width="220" alt="Mobile Profile"/>
   &nbsp;&nbsp;&nbsp;
-  <img src="./docs/images/mobile-public-profile.png" width="220" alt="Mobile Public Profile"/>
+  <img src="./expense-tracker-screenshot/mobile-public-profile.png" width="220" alt="Mobile Public Profile"/>
 </p>
 <p align="center">
-  <img src="./docs/images/mobile-public-profile-2.png" width="220" alt="Mobile Public Profile 2"/>
+  <img src="./expense-tracker-screenshot/mobile-public-profile-2.png" width="220" alt="Mobile Public Profile 2"/>
   &nbsp;&nbsp;&nbsp;
-  <img src="./docs/images/mobile-export.png" width="220" alt="Mobile Export"/>
+  <img src="./expense-tracker-screenshot/mobile-export.png" width="220" alt="Mobile Export"/>
 </p>
 
 > Profile customization, public visibility controls, and date-range export workflow.
@@ -108,18 +106,6 @@ This project is useful when you want to:
 | 🖼️ **Media Uploads** | Multer validation + Cloudinary storage for profile photos |
 | ⚡ **Performance-Oriented** | Supports lazy-loading architecture and reduced API churn patterns |
 | 📈 **Observability** | Structured logger + optional Axiom integration |
-
----
-
-## 🧠 Engineering Highlights
-
-- Implemented session-based authentication with centralized logging for API monitoring and error tracking.
-- Built scalable follower APIs using cursor-based pagination with infinite scroll and private account handling.
-- Optimized frontend performance enablement using route/component lazy loading strategies and modal prefetching support.
-- Enhanced efficiency by reducing redundant API calls and supporting debounced request patterns.
-- Configured secure profile photo uploads using Multer with Cloudinary storage.
-- Built data-driven APIs for recurring payments, expense history, advanced filtering, trend analysis, and interactive heatmap insights.
-- Implemented Excel export support with date-range filtering for receipt/report downloads.
 
 ---
 
