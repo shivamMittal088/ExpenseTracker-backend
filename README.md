@@ -87,6 +87,16 @@ Built for production-style usage with clean route structure, secure auth flows, 
 
 ---
 
+### 📱 Lighthouse (Mobile)
+
+<p align="center">
+  <img src="./expense-tracker-screenshot/mobile-lighthouse.png" width="360" alt="Mobile Lighthouse Report"/>
+</p>
+
+> Mobile Lighthouse report snapshot.
+
+---
+
 ### 👤 Profile → 📤 Export
 
 <p align="center">
