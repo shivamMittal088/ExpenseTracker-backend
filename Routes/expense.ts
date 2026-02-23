@@ -6,18 +6,54 @@ import { logApiError, logEvent } from "../utils/logger";
 
 const expressRouter = express.Router();
 
-const parseBool = (value: unknown): boolean =>
-  value === true || value === "true" || value === "1" || value === 1;
+interface Category {
+  name: string;
+  color: string;
+  emoji: string;
+}
 
+interface ExpenseDoc {
+  amount: number;
+  category: Category;
+  notes?: string;
+  payment_mode: string;
+  occurredAt: Date;
+  userId: mongoose.Types.ObjectId | string;
+}
 
+const EXPENSE_PAGE_SIZE = 30;
 
+type ExpenseCursor = {
+  occurredAt: string;
+  id: string;
+};
+
+const encodeExpenseCursor = (cursor: ExpenseCursor) =>
+  Buffer.from(JSON.stringify(cursor), "utf8").toString("base64");
+
+const decodeExpenseCursor = (value: string): ExpenseCursor | null => {
+  try {
+    const parsed = JSON.parse(Buffer.from(value, "base64").toString("utf8")) as ExpenseCursor;
+    if (!parsed?.occurredAt || !parsed?.id) {
+      return null;
+    }
+    if (!mongoose.isValidObjectId(parsed.id)) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+// Add expense
 expressRouter.post(
   "/expense/add",
   userAuth,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { amount, category, notes, payment_mode, currency, occurredAt } = req.body || {};
-      const userId = (req as any).user?._id;
+      const { amount, category, notes, payment_mode, occurredAt, userId: bodyUserId } = req.body || {};
+      const userId = req.user?._id || bodyUserId;
 
       const normalizedPaymentMode =
         typeof payment_mode === "string"
@@ -30,7 +66,7 @@ expressRouter.post(
       const errors: string[] = [];
 
       if (typeof amount !== "number" || Number.isNaN(amount) || amount <= 0) {
-        errors.push("amount must be a positive number");
+        errors.push("Enter valid amount");
       }
 
       if (!category || typeof category.name !== "string" || !category.name.trim()) {
@@ -45,25 +81,39 @@ expressRouter.post(
         errors.push("payment_mode must be one of cash, card, bank_transfer, wallet, UPI");
       }
 
-      if (currency && (typeof currency !== "string" || currency.length !== 3)) {
-        errors.push("currency must be a 3-letter code (e.g. INR)");
-      }
-
       if (notes && typeof notes !== "string") {
         errors.push("notes must be a string");
       }
 
-      // Optional occurredAt: if missing/null/empty, default to server now; else parse and shift using client offset
-      let occurredAtDate: Date = new Date();
-      if (occurredAt !== undefined && occurredAt !== null && occurredAt !== "") {
-        const parsed = new Date(occurredAt);
-        if (Number.isNaN(parsed.getTime())) {
-          errors.push("occurredAt must be a valid date string");
-        } else {
-          const clientOffset = Number(req.query.tzOffsetMinutes);
-          const offsetMinutes = Number.isFinite(clientOffset) ? clientOffset : parsed.getTimezoneOffset();
-          occurredAtDate = new Date(parsed.getTime() + offsetMinutes * 60000);
+      const tzOffsetMinutes = parseInt(String(req.query.tzOffsetMinutes || "0"), 10) || 0;
+
+      const parseOccurredAt = (value: unknown): Date | null => {
+        if (typeof value !== "string" || !value.trim()) return null;
+        const raw = value.trim();
+
+        const hasTimezone = /([zZ]|[+-]\d{2}:\d{2})$/.test(raw);
+        if (hasTimezone) {
+          const parsed = new Date(raw);
+          return Number.isNaN(parsed.getTime()) ? null : parsed;
         }
+
+        const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/);
+        if (!match) {
+          const parsed = new Date(raw);
+          return Number.isNaN(parsed.getTime()) ? null : parsed;
+        }
+
+        const [, y, mo, d, h, mi, s = "0"] = match;
+        const utcMs =
+          Date.UTC(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(s), 0) +
+          tzOffsetMinutes * 60 * 1000;
+
+        return new Date(utcMs);
+      };
+
+      const occurredAtDate = occurredAt ? parseOccurredAt(occurredAt) : new Date();
+      if (occurredAt && !occurredAtDate) {
+        errors.push("occurredAt is invalid");
       }
 
       if (errors.length) {
@@ -75,7 +125,7 @@ expressRouter.post(
         return res.status(400).json({ message: errors.join("; ") });
       }
 
-      const expenseDoc: any = {
+      const expenseDoc: ExpenseDoc = {
         amount,
         category: {
           name: category.name.trim(),
@@ -84,13 +134,9 @@ expressRouter.post(
         },
         notes,
         payment_mode: normalizedPaymentMode,
-        occurredAt: occurredAtDate,
+        occurredAt: occurredAtDate || new Date(),
         userId,
       };
-
-      if (currency) {
-        expenseDoc.currency = currency.toUpperCase();
-      }
 
       const newExpense = await Expense.create(expenseDoc);
 
@@ -113,60 +159,112 @@ expressRouter.post(
   }
 );
 
-// Fetch expenses for a given local calendar date (YYYY-MM-DD), honoring optional tzOffsetMinutes
+// Fetch expenses for a given date (YYYY-MM-DD)
 expressRouter.get("/expense/:date", userAuth, async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user._id;
-    const rawDate = req.params.date;
+    const userId = req.user!._id;
+    const rawDate = Array.isArray(req.params.date) ? req.params.date[0] : req.params.date;
 
-    if (!rawDate || typeof rawDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
-      logEvent("warn", "Invalid expense date format", {
-        route: "GET /expense/:date",
-        userId,
-        rawDate,
-      });
-      return res.status(400).json({ message: "Invalid date format. Use YYYY-MM-DD" });
+    const dateParts = rawDate.split("-").map((part: string) => Number(part));
+    if (dateParts.length !== 3 || dateParts.some((part) => Number.isNaN(part))) {
+      return res.status(400).json({ message: "Invalid date format" });
     }
+    const [year, month, day] = dateParts;
 
-    const localStart = new Date(rawDate + "T00:00:00");
-    if (Number.isNaN(localStart.getTime())) {
-      logEvent("warn", "Invalid expense calendar date", {
-        route: "GET /expense/:date",
-        userId,
-        rawDate,
-      });
-      return res.status(400).json({ message: "Invalid calendar date" });
-    }
+    const tzOffsetMinutes = parseInt(String(req.query.tzOffsetMinutes || "0"), 10) || 0;
 
-    const clientOffset = Number(req.query.tzOffsetMinutes);
-    const offsetMinutes = Number.isFinite(clientOffset) ? clientOffset : localStart.getTimezoneOffset();
+    const startOfDay = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0) + tzOffsetMinutes * 60 * 1000);
+    const endOfDay = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999) + tzOffsetMinutes * 60 * 1000);
 
-    const utcStart = new Date(localStart.getTime() + offsetMinutes * 60000);
-    const utcEnd = new Date(utcStart);
-    utcEnd.setDate(utcEnd.getDate() + 1);
+    const page = Math.max(1, parseInt(String(req.query.page || "1"), 10) || 1);
+    const limit = Math.max(1, parseInt(String(req.query.limit || "8"), 10) || 8);
+    const skip = (page - 1) * limit;
 
-    const includeHidden = parseBool(req.query.includeHidden);
-    const onlyHidden = parseBool(req.query.onlyHidden);
+    const baseMatch: Record<string, unknown> = {
+      userId: new mongoose.Types.ObjectId(userId),
+      isHidden: { $ne: true },
+    };
 
-    const expenseTransactions = await Expense.find({
-      userId,
-      ...(onlyHidden ? { deleted: true } : includeHidden ? {} : { deleted: false }),
-      occurredAt: {
-        $gte: utcStart,
-        $lt: utcEnd,
+    const effectiveDateStages = [
+      {
+        $addFields: {
+          effectiveOccurredAt: {
+            $ifNull: ["$occurredAt", { $ifNull: ["$occuredAt", "$createdAt"] }],
+          },
+        },
       },
-    }).sort({ occurredAt: -1 });
+      {
+        $match: {
+          effectiveOccurredAt: {
+            $gte: startOfDay,
+            $lte: endOfDay,
+          },
+        },
+      },
+    ];
+
+    const hiddenBaseMatch: Record<string, unknown> = {
+      userId: new mongoose.Types.ObjectId(userId),
+      isHidden: true,
+    };
+
+    const [expenseTransactions, totals, hiddenTotals] = await Promise.all([
+      Expense.aggregate([
+        { $match: baseMatch },
+        ...effectiveDateStages,
+        { $sort: { effectiveOccurredAt: -1, _id: -1 } },
+        { $skip: skip },
+        { $limit: limit },
+      ]),
+      Expense.aggregate([
+        { $match: baseMatch },
+        ...effectiveDateStages,
+        {
+          $group: {
+            _id: null,
+            totalCount: { $sum: 1 },
+            totalAmount: { $sum: "$amount" },
+          },
+        },
+      ]),
+      Expense.aggregate([
+        { $match: hiddenBaseMatch },
+        ...effectiveDateStages,
+        {
+          $group: {
+            _id: null,
+            totalCount: { $sum: 1 },
+          },
+        },
+      ]),
+    ]);
+
+    const totalCount = totals[0]?.totalCount || 0;
+    const totalAmount = totals[0]?.totalAmount || 0;
+    const hiddenCount = hiddenTotals[0]?.totalCount || 0;
+    const totalPages = Math.max(1, Math.ceil(totalCount / limit));
 
     logEvent("info", "Expense list fetched", {
       route: "GET /expense/:date",
       userId,
       count: expenseTransactions.length,
       date: rawDate,
+      page,
+      limit,
+      totalCount,
     });
 
     return res.json({
       message: "Expense list successfully fetched",
       data: expenseTransactions,
+      meta: {
+        page,
+        limit,
+        totalCount,
+        totalPages,
+        totalAmount,
+        hiddenCount,
+      },
     });
   } catch (err) {
     logApiError(req, err, { route: "GET /expense/:date" });
@@ -174,209 +272,61 @@ expressRouter.get("/expense/:date", userAuth, async (req: Request, res: Response
   }
 });
 
-// Soft hide / restore an expense
-expressRouter.patch(
-  "/expense/:expenseId/hide",
-  userAuth,
-  async (req: Request, res: Response) => {
-    try {
-      const { expenseId } = req.params;
-      const userId = (req as any).user._id;
-      const { hide = true } = req.body ?? {};
-
-      if (!mongoose.isValidObjectId(expenseId)) {
-        logEvent("warn", "Invalid expense id", {
-          route: "PATCH /expense/:expenseId/hide",
-          userId,
-          expenseId,
-        });
-        return res.status(400).json({ message: "Invalid expense id" });
-      }
-
-      if (typeof hide !== "boolean") {
-        logEvent("warn", "Invalid hide flag", {
-          route: "PATCH /expense/:expenseId/hide",
-          userId,
-          expenseId,
-          hide,
-        });
-        return res.status(400).json({ message: "hide must be a boolean" });
-      }
-
-      const updated = await Expense.findOneAndUpdate(
-        { _id: expenseId, userId },
-        { deleted: hide },
-        { new: true }
-      );
-
-      if (!updated) {
-        logEvent("warn", "Expense not found for hide/update", {
-          route: "PATCH /expense/:expenseId/hide",
-          userId,
-          expenseId,
-        });
-        return res.status(404).json({ message: "Expense not found" });
-      }
-
-      logEvent("info", "Expense hide updated", {
-        route: "PATCH /expense/:expenseId/hide",
-        userId,
-        expenseId,
-        hidden: updated.deleted,
-      });
-
-      return res.status(200).json({
-        message: hide ? "Expense hidden" : "Expense restored",
-        data: updated,
-      });
-    } catch (err) {
-      logApiError(req, err, { route: "PATCH /expense/:expenseId/hide" });
-      return res.status(500).json({ message: "Failed to update expense" });
+// Fetch all expenses with cursor pagination
+expressRouter.get("/expenses/paged", userAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!._id;
+    const cursorValue = typeof req.query.cursor === "string" ? req.query.cursor : "";
+    const cursor = cursorValue ? decodeExpenseCursor(cursorValue) : null;
+    if (cursorValue && !cursor) {
+      return res.status(400).json({ message: "Invalid cursor" });
     }
+
+    const baseFilter: Record<string, unknown> = {
+      userId,
+      isHidden: { $ne: true },
+    };
+
+    const cursorFilter = cursor
+      ? {
+          $or: [
+            { occurredAt: { $lt: new Date(cursor.occurredAt) } },
+            {
+              occurredAt: new Date(cursor.occurredAt),
+              _id: { $lt: new mongoose.Types.ObjectId(cursor.id) },
+            },
+          ],
+        }
+      : {};
+
+    const expenses = await Expense.find({
+      ...baseFilter,
+      ...cursorFilter,
+    })
+      .sort({ occurredAt: -1, _id: -1 })
+      .limit(EXPENSE_PAGE_SIZE)
+      .lean();
+
+    const last = expenses[expenses.length - 1];
+    const nextCursor = last && expenses.length === EXPENSE_PAGE_SIZE
+      ? encodeExpenseCursor({ occurredAt: new Date(last.occurredAt).toISOString(), id: String(last._id) })
+      : null;
+
+    logEvent("info", "Expenses paged fetched", {
+      route: "GET /expenses/paged",
+      userId,
+      count: expenses.length,
+    });
+
+    return res.json({
+      message: "Expenses fetched",
+      data: expenses,
+      nextCursor,
+    });
+  } catch (err) {
+    logApiError(req, err as Error, { route: "GET /expenses/paged" });
+    return res.status(500).json({ message: "Failed to load expenses" });
   }
-);
-
-// Update an expense (amount, category, notes, payment_mode, currency, occurredAt)
-expressRouter.patch(
-  "/expense/:expenseId",
-  userAuth,
-  async (req: Request, res: Response) => {
-    try {
-      const { expenseId } = req.params;
-      const userId = (req as any).user._id;
-
-      if (!mongoose.isValidObjectId(expenseId)) {
-        logEvent("warn", "Invalid expense id", {
-          route: "PATCH /expense/:expenseId",
-          userId,
-          expenseId,
-        });
-        return res.status(400).json({ message: "Invalid expense id" });
-      }
-
-      const { amount, category, notes, payment_mode, currency, occurredAt } = req.body || {};
-
-      const updateDoc: any = {};
-      const errors: string[] = [];
-
-      if (amount !== undefined) {
-        if (typeof amount !== "number" || Number.isNaN(amount) || amount <= 0) {
-          errors.push("amount must be a positive number");
-        } else {
-          updateDoc.amount = amount;
-        }
-      }
-
-      if (category !== undefined) {
-        if (!category || typeof category.name !== "string" || !category.name.trim()) {
-          errors.push("category.name is required");
-        }
-        if (category?.color && typeof category.color === "string" && !/^#([0-9A-Fa-f]{6})$/.test(category.color)) {
-          errors.push("category.color must be a 6-digit hex code (e.g. #ff9900)");
-        }
-
-        if (errors.length === 0) {
-          updateDoc.category = {
-            name: category.name.trim(),
-            color: category.color || "#CCCCCC",
-            emoji: category.emoji || "",
-          };
-        }
-      }
-
-      if (notes !== undefined) {
-        if (notes !== null && typeof notes !== "string") {
-          errors.push("notes must be a string");
-        } else {
-          updateDoc.notes = notes;
-        }
-      }
-
-      if (payment_mode !== undefined) {
-        const normalizedPaymentMode =
-          typeof payment_mode === "string"
-            ? payment_mode.toLowerCase() === "upi"
-              ? "UPI"
-              : payment_mode.toLowerCase()
-            : "";
-
-        const allowedPaymentModes = new Set(["cash", "card", "bank_transfer", "wallet", "UPI"]);
-
-        if (!allowedPaymentModes.has(normalizedPaymentMode)) {
-          errors.push("payment_mode must be one of cash, card, bank_transfer, wallet, UPI");
-        } else {
-          updateDoc.payment_mode = normalizedPaymentMode;
-        }
-      }
-
-      if (currency !== undefined) {
-        if (typeof currency !== "string" || currency.length !== 3) {
-          errors.push("currency must be a 3-letter code (e.g. INR)");
-        } else {
-          updateDoc.currency = currency.toUpperCase();
-        }
-      }
-
-      if (occurredAt !== undefined) {
-        const parsed = new Date(occurredAt);
-        if (Number.isNaN(parsed.getTime())) {
-          errors.push("occurredAt must be a valid date string");
-        } else {
-          const clientOffset = Number(req.query.tzOffsetMinutes);
-          const offsetMinutes = Number.isFinite(clientOffset) ? clientOffset : parsed.getTimezoneOffset();
-          updateDoc.occurredAt = new Date(parsed.getTime() + offsetMinutes * 60000);
-        }
-      }
-
-      if (errors.length) {
-        logEvent("warn", "Expense update validation failed", {
-          route: "PATCH /expense/:expenseId",
-          userId,
-          expenseId,
-          errors,
-        });
-        return res.status(400).json({ message: errors.join("; ") });
-      }
-
-      if (Object.keys(updateDoc).length === 0) {
-        logEvent("warn", "No updatable fields provided", {
-          route: "PATCH /expense/:expenseId",
-          userId,
-          expenseId,
-        });
-        return res.status(400).json({ message: "No updatable fields provided" });
-      }
-
-      const updated = await Expense.findOneAndUpdate(
-        { _id: expenseId, userId },
-        { $set: updateDoc },
-        { new: true }
-      );
-
-      if (!updated) {
-        logEvent("warn", "Expense not found", {
-          route: "PATCH /expense/:expenseId",
-          userId,
-          expenseId,
-        });
-        return res.status(404).json({ message: "Expense not found" });
-      }
-
-      logEvent("info", "Expense updated", {
-        route: "PATCH /expense/:expenseId",
-        userId,
-        expenseId,
-      });
-
-      return res.status(200).json({
-        message: "Expense updated",
-        data: updated,
-      });
-    } catch (err) {
-      logApiError(req, err, { route: "PATCH /expense/:expenseId" });
-      return res.status(500).json({ message: "Failed to update expense" });
-    }
-  }
-);
+});
 
 export default expressRouter;
