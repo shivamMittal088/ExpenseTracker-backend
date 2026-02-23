@@ -19,7 +19,7 @@ interface AuthRequest extends Request {
   ];
 
 // Get all tiles for the current user
-tileRouter.get("/tiles", userAuth ,async (req:Request, res:Response) => {
+tileRouter.get("/tile", userAuth ,async (req:Request, res:Response) => {
   try {
      const authReq = req as AuthRequest; // 👈 cast here
     const userId = authReq.user._id;
@@ -28,7 +28,7 @@ tileRouter.get("/tiles", userAuth ,async (req:Request, res:Response) => {
     if (builtInCount === 0) {
       await Tiles.insertMany(DEFAULT_TILES, { ordered: false });
       logEvent("info", "Default tiles auto-seeded", {
-        route: "GET /tiles",
+        route: "GET /tile",
         userId,
         count: DEFAULT_TILES.length,
       });
@@ -42,21 +42,21 @@ tileRouter.get("/tiles", userAuth ,async (req:Request, res:Response) => {
     }).sort({ isBuiltIn: -1, name: 1 }); // built-ins first, then user tiles
 
     logEvent("info", "Tiles fetched", {
-      route: "GET /tiles",
+      route: "GET /tile",
       userId,
       count: tiles.length,
     });
 
     res.json(tiles);
   } catch (err) {
-    logApiError(req, err, { route: "GET /tiles" });
+    logApiError(req, err, { route: "GET /tile" });
     res.status(500).json({ message: "Failed to load tiles" });
   }
 });
 
 
 
-tileRouter.post("/tiles/add", userAuth, async(req:Request,res:Response)=>{
+tileRouter.post("/tile/add", userAuth, async(req:Request,res:Response)=>{
   try{
     const { name, color, emoji } = req.body;
 
@@ -71,7 +71,7 @@ tileRouter.post("/tiles/add", userAuth, async(req:Request,res:Response)=>{
   })
 
   logEvent("info", "Tile added", {
-    route: "POST /tiles/add",
+    route: "POST /tile/add",
     userId: loggedInUserId,
     tileId: addTile._id,
     name: addTile.name,
@@ -84,13 +84,13 @@ tileRouter.post("/tiles/add", userAuth, async(req:Request,res:Response)=>{
   }
 
   catch(err){
-    logApiError(req, err, { route: "POST /tiles/add" });
+    logApiError(req, err, { route: "POST /tile/add" });
     res.status(500).json({ message: "Failed to add tile" });
   }
 })
 
 
-tileRouter.delete("/tiles/remove/:id" ,userAuth , async(req:Request ,res:Response)=>{
+tileRouter.delete("/tile/remove/:id" ,userAuth , async(req:Request ,res:Response)=>{
   try{
     const authReq = req as AuthRequest;
     const loggedInUserId = authReq.user._id;
@@ -110,7 +110,7 @@ tileRouter.delete("/tiles/remove/:id" ,userAuth , async(req:Request ,res:Respons
     await Tiles.deleteOne({ _id: tileId, userId: loggedInUserId });
 
     logEvent("info", "Tile removed", {
-      route: "DELETE /tiles/remove/:id",
+      route: "DELETE /tile/remove/:id",
       userId: loggedInUserId,
       tileId,
       tileName: tile.name,
@@ -118,7 +118,7 @@ tileRouter.delete("/tiles/remove/:id" ,userAuth , async(req:Request ,res:Respons
 
     res.status(200).json({ message: "Tile deleted successfully", tileId });
   }catch(err){
-    logApiError(req, err, { route: "DELETE /tiles/remove/:id" });
+    logApiError(req, err, { route: "DELETE /tile/remove/:id" });
     res.status(500).json({ message: "Failed to remove tile" });
   }
 })

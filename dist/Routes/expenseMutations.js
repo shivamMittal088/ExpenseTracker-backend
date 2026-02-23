@@ -10,7 +10,7 @@ const userAuth_1 = __importDefault(require("../Middlewares/userAuth"));
 const logger_1 = require("../utils/logger");
 const expenseMutationsRouter = express_1.default.Router();
 // Fetch hidden expenses for a given date (YYYY-MM-DD)
-expenseMutationsRouter.get("/expense/:date/hidden", userAuth_1.default, async (req, res) => {
+expenseMutationsRouter.get("/expenseMutations/:date/hidden", userAuth_1.default, async (req, res) => {
     try {
         const userId = req.user._id;
         const rawDate = Array.isArray(req.params.date) ? req.params.date[0] : req.params.date;
@@ -64,7 +64,7 @@ expenseMutationsRouter.get("/expense/:date/hidden", userAuth_1.default, async (r
         const totalCount = totals[0]?.totalCount || 0;
         const totalAmount = totals[0]?.totalAmount || 0;
         (0, logger_1.logEvent)("info", "Hidden expense list fetched", {
-            route: "GET /expense/:date/hidden",
+            route: "GET /expenseMutations/:date/hidden",
             userId,
             count: hiddenExpenses.length,
             date: rawDate,
@@ -80,18 +80,18 @@ expenseMutationsRouter.get("/expense/:date/hidden", userAuth_1.default, async (r
         });
     }
     catch (err) {
-        (0, logger_1.logApiError)(req, err, { route: "GET /expense/:date/hidden" });
+        (0, logger_1.logApiError)(req, err, { route: "GET /expenseMutations/:date/hidden" });
         return res.status(500).json({ message: "Failed to load hidden expenses" });
     }
 });
 // Hide an expense (soft delete)
-expenseMutationsRouter.patch("/expense/:expenseId/hide", userAuth_1.default, async (req, res) => {
+expenseMutationsRouter.patch("/expenseMutations/:expenseId/hide", userAuth_1.default, async (req, res) => {
     try {
         const { expenseId } = req.params;
         const userId = req.user._id;
         if (!mongoose_1.default.isValidObjectId(expenseId)) {
             (0, logger_1.logEvent)("warn", "Invalid expense id", {
-                route: "PATCH /expense/:expenseId/hide",
+                route: "PATCH /expenseMutations/:expenseId/hide",
                 userId,
                 expenseId,
             });
@@ -112,14 +112,14 @@ expenseMutationsRouter.patch("/expense/:expenseId/hide", userAuth_1.default, asy
                 });
             }
             (0, logger_1.logEvent)("warn", "Expense not found for hide", {
-                route: "PATCH /expense/:expenseId/hide",
+                route: "PATCH /expenseMutations/:expenseId/hide",
                 userId,
                 expenseId,
             });
             return res.status(404).json({ message: "Expense not found" });
         }
         (0, logger_1.logEvent)("info", "Expense hidden", {
-            route: "PATCH /expense/:expenseId/hide",
+            route: "PATCH /expenseMutations/:expenseId/hide",
             userId,
             expenseId,
         });
@@ -129,18 +129,18 @@ expenseMutationsRouter.patch("/expense/:expenseId/hide", userAuth_1.default, asy
         });
     }
     catch (err) {
-        (0, logger_1.logApiError)(req, err, { route: "PATCH /expense/:expenseId/hide" });
+        (0, logger_1.logApiError)(req, err, { route: "PATCH /expenseMutations/:expenseId/hide" });
         return res.status(500).json({ message: "Failed to hide expense" });
     }
 });
 // Restore a hidden expense
-expenseMutationsRouter.patch("/expense/:expenseId/restore", userAuth_1.default, async (req, res) => {
+expenseMutationsRouter.patch("/expenseMutations/:expenseId/restore", userAuth_1.default, async (req, res) => {
     try {
         const { expenseId } = req.params;
         const userId = req.user._id;
         if (!mongoose_1.default.isValidObjectId(expenseId)) {
             (0, logger_1.logEvent)("warn", "Invalid expense id", {
-                route: "PATCH /expense/:expenseId/restore",
+                route: "PATCH /expenseMutations/:expenseId/restore",
                 userId,
                 expenseId,
             });
@@ -154,14 +154,14 @@ expenseMutationsRouter.patch("/expense/:expenseId/restore", userAuth_1.default, 
         }, { new: true });
         if (!restoredExpense) {
             (0, logger_1.logEvent)("warn", "Hidden expense not found for restore", {
-                route: "PATCH /expense/:expenseId/restore",
+                route: "PATCH /expenseMutations/:expenseId/restore",
                 userId,
                 expenseId,
             });
             return res.status(404).json({ message: "Hidden expense not found" });
         }
         (0, logger_1.logEvent)("info", "Expense restored", {
-            route: "PATCH /expense/:expenseId/restore",
+            route: "PATCH /expenseMutations/:expenseId/restore",
             userId,
             expenseId,
         });
@@ -171,18 +171,18 @@ expenseMutationsRouter.patch("/expense/:expenseId/restore", userAuth_1.default, 
         });
     }
     catch (err) {
-        (0, logger_1.logApiError)(req, err, { route: "PATCH /expense/:expenseId/restore" });
+        (0, logger_1.logApiError)(req, err, { route: "PATCH /expenseMutations/:expenseId/restore" });
         return res.status(500).json({ message: "Failed to restore expense" });
     }
 });
 // Update an expense (amount, category, notes, payment_mode, occurredAt)
-expenseMutationsRouter.patch("/expense/:expenseId", userAuth_1.default, async (req, res) => {
+expenseMutationsRouter.patch("/expenseMutations/:expenseId", userAuth_1.default, async (req, res) => {
     try {
         const { expenseId } = req.params;
         const userId = req.user._id;
         if (!mongoose_1.default.isValidObjectId(expenseId)) {
             (0, logger_1.logEvent)("warn", "Invalid expense id", {
-                route: "PATCH /expense/:expenseId",
+                route: "PATCH /expenseMutations/:expenseId",
                 userId,
                 expenseId,
             });
@@ -247,7 +247,7 @@ expenseMutationsRouter.patch("/expense/:expenseId", userAuth_1.default, async (r
         }
         if (errors.length) {
             (0, logger_1.logEvent)("warn", "Expense update validation failed", {
-                route: "PATCH /expense/:expenseId",
+                route: "PATCH /expenseMutations/:expenseId",
                 userId,
                 expenseId,
                 errors,
@@ -256,7 +256,7 @@ expenseMutationsRouter.patch("/expense/:expenseId", userAuth_1.default, async (r
         }
         if (Object.keys(updateDoc).length === 0) {
             (0, logger_1.logEvent)("warn", "No updatable fields provided", {
-                route: "PATCH /expense/:expenseId",
+                route: "PATCH /expenseMutations/:expenseId",
                 userId,
                 expenseId,
             });
@@ -265,14 +265,14 @@ expenseMutationsRouter.patch("/expense/:expenseId", userAuth_1.default, async (r
         const updated = await ExpenseSchema_1.default.findOneAndUpdate({ _id: expenseId, userId }, { $set: updateDoc }, { new: true });
         if (!updated) {
             (0, logger_1.logEvent)("warn", "Expense not found", {
-                route: "PATCH /expense/:expenseId",
+                route: "PATCH /expenseMutations/:expenseId",
                 userId,
                 expenseId,
             });
             return res.status(404).json({ message: "Expense not found" });
         }
         (0, logger_1.logEvent)("info", "Expense updated", {
-            route: "PATCH /expense/:expenseId",
+            route: "PATCH /expenseMutations/:expenseId",
             userId,
             expenseId,
         });
@@ -282,7 +282,7 @@ expenseMutationsRouter.patch("/expense/:expenseId", userAuth_1.default, async (r
         });
     }
     catch (err) {
-        (0, logger_1.logApiError)(req, err, { route: "PATCH /expense/:expenseId" });
+        (0, logger_1.logApiError)(req, err, { route: "PATCH /expenseMutations/:expenseId" });
         return res.status(500).json({ message: "Failed to update expense" });
     }
 });

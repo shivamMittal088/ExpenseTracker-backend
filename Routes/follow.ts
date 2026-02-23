@@ -33,12 +33,12 @@ const decodeCursor = (value: string): FollowCursor | null => {
 };
 
 /**
- * POST /profile/follow/:userId
+ * POST /follow/follow/:userId
  * - Requires userAuth
  * - Creates a follow request (pending)
  */
 followRouter.post(
-  "/profile/follow/:userId",
+  "/follow/follow/:userId",
   userAuth,
   async (req: Request, res: Response) => {
     try {
@@ -82,26 +82,26 @@ followRouter.post(
       });
 
       logEvent("info", "Follow request created", {
-        route: "POST /profile/follow/:userId",
+        route: "POST /follow/follow/:userId",
         userId: followerId,
         targetUserId,
       });
 
       return res.status(201).json({ status: follow.status });
     } catch (err: any) {
-      logApiError(req, err, { route: "POST /profile/follow/:userId" });
+      logApiError(req, err, { route: "POST /follow/follow/:userId" });
       return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
   }
 );
 
 /**
- * DELETE /profile/follow/:userId
+ * DELETE /follow/follow/:userId
  * - Requires userAuth
  * - Cancels a pending follow request or unfollows an accepted user
  */
 followRouter.delete(
-  "/profile/follow/:userId",
+  "/follow/follow/:userId",
   userAuth,
   async (req: Request, res: Response) => {
     try {
@@ -128,7 +128,7 @@ followRouter.delete(
       }
 
       logEvent("info", "Follow removed", {
-        route: "DELETE /profile/follow/:userId",
+        route: "DELETE /follow/follow/:userId",
         userId: followerId,
         targetUserId,
         previousStatus: deleted.status,
@@ -136,19 +136,19 @@ followRouter.delete(
 
       return res.status(200).json({ status: "none" });
     } catch (err: any) {
-      logApiError(req, err, { route: "DELETE /profile/follow/:userId" });
+      logApiError(req, err, { route: "DELETE /follow/follow/:userId" });
       return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
   }
 );
 
 /**
- * GET /profile/follow-status/:userId
+ * GET /follow/follow-status/:userId
  * - Requires userAuth
  * - Returns follow status to target user
  */
 followRouter.get(
-  "/profile/follow-status/:userId",
+  "/follow/follow-status/:userId",
   userAuth,
   async (req: Request, res: Response) => {
     try {
@@ -171,19 +171,19 @@ followRouter.get(
 
       return res.status(200).json({ status: follow.status });
     } catch (err: any) {
-      logApiError(req, err, { route: "GET /profile/follow-status/:userId" });
+      logApiError(req, err, { route: "GET /follow/follow-status/:userId" });
       return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
   }
 );
 
 /**
- * GET /profile/follow-requests
+ * GET /follow/follow-requests
  * - Requires userAuth
  * - Returns pending follow requests for the logged-in user
  */
 followRouter.get(
-  "/profile/follow-requests",
+  "/follow/follow-requests",
   userAuth,
   async (req: Request, res: Response) => {
     try {
@@ -215,19 +215,19 @@ followRouter.get(
 
       return res.status(200).json({ requests: results });
     } catch (err: any) {
-      logApiError(req, err, { route: "GET /profile/follow-requests" });
+      logApiError(req, err, { route: "GET /follow/follow-requests" });
       return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
   }
 );
 
 /**
- * POST /profile/follow-requests/:requestId/accept
+ * POST /follow/follow-requests/:requestId/accept
  * - Requires userAuth
  * - Accepts a pending follow request
  */
 followRouter.post(
-  "/profile/follow-requests/:requestId/accept",
+  "/follow/follow-requests/:requestId/accept",
   userAuth,
   async (req: Request, res: Response) => {
     try {
@@ -255,26 +255,26 @@ followRouter.post(
       }
 
       logEvent("info", "Follow request accepted", {
-        route: "POST /profile/follow-requests/:requestId/accept",
+        route: "POST /follow/follow-requests/:requestId/accept",
         userId: req.user._id,
         requestId,
       });
 
       return res.status(200).json({ status: "accepted" });
     } catch (err: any) {
-      logApiError(req, err, { route: "POST /profile/follow-requests/:requestId/accept" });
+      logApiError(req, err, { route: "POST /follow/follow-requests/:requestId/accept" });
       return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
   }
 );
 
 /**
- * DELETE /profile/follow-requests/:requestId
+ * DELETE /follow/follow-requests/:requestId
  * - Requires userAuth
  * - Declines a pending follow request
  */
 followRouter.delete(
-  "/profile/follow-requests/:requestId",
+  "/follow/follow-requests/:requestId",
   userAuth,
   async (req: Request, res: Response) => {
     try {
@@ -298,26 +298,26 @@ followRouter.delete(
       }
 
       logEvent("info", "Follow request declined", {
-        route: "DELETE /profile/follow-requests/:requestId",
+        route: "DELETE /follow/follow-requests/:requestId",
         userId: req.user._id,
         requestId,
       });
 
       return res.status(200).json({ status: "declined" });
     } catch (err: any) {
-      logApiError(req, err, { route: "DELETE /profile/follow-requests/:requestId" });
+      logApiError(req, err, { route: "DELETE /follow/follow-requests/:requestId" });
       return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
   }
 );
 
 /**
- * GET /profile/all-followers
+ * GET /follow/all-followers
  * - Requires userAuth
  * - Returns accepted followers for the logged-in user
  */
 followRouter.get(
-  "/profile/all-followers",
+  "/follow/all-followers",
   userAuth,
   async (req: Request, res: Response) => {
     try {
@@ -380,19 +380,19 @@ followRouter.get(
 
       return res.status(200).json({ followers: results, nextCursor });
     } catch (err: any) {
-      logApiError(req, err, { route: "GET /profile/all-followers" });
+      logApiError(req, err, { route: "GET /follow/all-followers" });
       return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
   }
 );
 
 /**
- * GET /profile/all-following
+ * GET /follow/all-following
  * - Requires userAuth
  * - Returns accepted following for the logged-in user
  */
 followRouter.get(
-  "/profile/all-following",
+  "/follow/all-following",
   userAuth,
   async (req: Request, res: Response) => {
     try {
@@ -455,7 +455,7 @@ followRouter.get(
 
       return res.status(200).json({ following: results, nextCursor });
     } catch (err: any) {
-      logApiError(req, err, { route: "GET /profile/all-following" });
+      logApiError(req, err, { route: "GET /follow/all-following" });
       return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
   }

@@ -10,7 +10,7 @@ const authRouter = express.Router();
 const TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // 1 day
 
 /* ---------- Signup ---------- */
-authRouter.post("/signup", async (req:  Request, res: Response) => {
+authRouter.post("/auth/signup", async (req:  Request, res: Response) => {
   try {
     const { emailId, password, name } = req.body;
 
@@ -45,14 +45,14 @@ authRouter.post("/signup", async (req:  Request, res: Response) => {
     });
 
     logEvent("info", "User signed up", {
-      route: "POST /signup",
+      route: "POST /auth/signup",
       userId: savedUser._id,
       emailId,
     });
 
     res.json({ message: "Signup successful", token });
   } catch (err: any) {
-    logApiError(req, err, { route: "POST /signup" });
+    logApiError(req, err, { route: "POST /auth/signup" });
     res.status(400).json({ err: err.message });
   }
 });
@@ -61,7 +61,7 @@ authRouter.post("/signup", async (req:  Request, res: Response) => {
 
 
 /* ---------- Login ---------- */
-authRouter.post("/login", async (req:  Request, res: Response) => {
+authRouter.post("/auth/login", async (req:  Request, res: Response) => {
   try {
     const { emailId, password } = req.body;
 
@@ -94,14 +94,14 @@ authRouter.post("/login", async (req:  Request, res: Response) => {
     const { password: _password, ...safeUser } = user. toObject();
 
     logEvent("info", "User logged in", {
-      route: "POST /login",
+      route: "POST /auth/login",
       userId: user._id,
       emailId,
     });
 
     res.json({ ...safeUser, token });
   } catch (err: any) {
-    logApiError(req, err, { route: "POST /login" });
+    logApiError(req, err, { route: "POST /auth/login" });
     res.status(400).json({ err: err.message });
   }
 });
@@ -109,9 +109,9 @@ authRouter.post("/login", async (req:  Request, res: Response) => {
 
 
 /* ---------- Get Current User ---------- */
-authRouter.get("/me", userAuth, (req: Request, res: Response) => {
+authRouter.get("/auth/me", userAuth, (req: Request, res: Response) => {
   logEvent("info", "Fetched current user", {
-    route: "GET /me",
+    route: "GET /auth/me",
     userId: (req as any).user._id,
   });
 
@@ -125,18 +125,18 @@ authRouter.get("/me", userAuth, (req: Request, res: Response) => {
 
 
 /* ---------- Logout ---------- */
-authRouter.post("/logout", userAuth, async (req: Request, res:  Response) => {
+authRouter.post("/auth/logout", userAuth, async (req: Request, res:  Response) => {
   try {
     res.clearCookie("token");
 
     logEvent("info", "User logged out", {
-      route: "POST /logout",
+      route: "POST /auth/logout",
       userId: (req as any).user._id,
     });
 
     res.json({ message: "Logged out successfully" });
   } catch (err: any) {
-    logApiError(req, err, { route: "POST /logout" });
+    logApiError(req, err, { route: "POST /auth/logout" });
     res.status(400).json({ err: err.message });
   }
 });
@@ -144,7 +144,7 @@ authRouter.post("/logout", userAuth, async (req: Request, res:  Response) => {
 
 
 /* ---------- Update Password ---------- */
-authRouter.patch("/update/password", userAuth, async (req: Request, res: Response) => {
+authRouter.patch("/auth/update/password", userAuth, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user._id;
     const { oldPassword, newPassword } = req.body;
@@ -167,13 +167,13 @@ authRouter.patch("/update/password", userAuth, async (req: Request, res: Respons
     res.clearCookie("token");
 
     logEvent("info", "User password updated", {
-      route: "PATCH /update/password",
+      route: "PATCH /auth/update/password",
       userId,
     });
 
     res.json({ message: "Password updated.  Please login again." });
   } catch (err: any) {
-    logApiError(req, err, { route: "PATCH /update/password" });
+    logApiError(req, err, { route: "PATCH /auth/update/password" });
     res.status(400).json({ err: err.message });
   }
 });

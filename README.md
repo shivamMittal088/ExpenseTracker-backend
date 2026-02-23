@@ -205,17 +205,17 @@ All backend routes currently used by the app are listed below.
 |---|---|---|
 | POST | `/api/expense/add` | Create expense |
 | GET | `/api/expense/:date` | Get visible expenses for a local date |
-| GET | `/api/expense/:date/hidden` | Get hidden expenses for a local date |
-| GET | `/api/expenses/paged` | Cursor-paginated transactions feed |
-| PATCH | `/api/expense/:expenseId/hide` | Hide (soft-delete) an expense |
-| PATCH | `/api/expense/:expenseId/restore` | Restore a hidden expense |
-| PATCH | `/api/expense/:expenseId` | Update expense fields (amount/category/notes/payment_mode/occurredAt) |
-| GET | `/api/expenses/range` | Get expenses for date range |
-| GET | `/api/expenses/export/excel` | Export expenses to Excel |
-| GET | `/api/expenses/recurring` | Recurring payments analysis |
-| GET | `/api/expenses/payment-breakdown` | Payment-mode analytics |
-| GET | `/api/expenses/spending-trends` | Spending trends analytics |
-| GET | `/api/expenses/heatmap` | Heatmap data for calendar view |
+| GET | `/api/expense/paged` | Cursor-paginated transactions feed |
+| GET | `/api/expenseMutations/:date/hidden` | Get hidden expenses for a local date |
+| PATCH | `/api/expenseMutations/:expenseId/hide` | Hide (soft-delete) an expense |
+| PATCH | `/api/expenseMutations/:expenseId/restore` | Restore a hidden expense |
+| PATCH | `/api/expenseMutations/:expenseId` | Update expense fields (amount/category/notes/payment_mode/occurredAt) |
+| GET | `/api/expenseAnalytics/range` | Get expenses for date range |
+| GET | `/api/expenseAnalytics/recurring` | Recurring payments analysis |
+| GET | `/api/expenseAnalytics/payment-breakdown` | Payment-mode analytics |
+| GET | `/api/expenseAnalytics/spending-trends` | Spending trends analytics |
+| GET | `/api/expenseAnalytics/heatmap` | Heatmap data for calendar view |
+| GET | `/api/expenseExport/excel` | Export expenses to Excel |
 
 ### Profile (`/api`)
 
@@ -231,32 +231,32 @@ All backend routes currently used by the app are listed below.
 
 | Method | Endpoint | Purpose |
 |---|---|---|
-| POST | `/api/profile/follow/:userId` | Send follow request |
-| DELETE | `/api/profile/follow/:userId` | Cancel request or unfollow |
-| GET | `/api/profile/follow-status/:userId` | Get relationship status |
-| GET | `/api/profile/follow-requests` | Get pending incoming requests |
-| POST | `/api/profile/follow-requests/:requestId/accept` | Accept follow request |
-| DELETE | `/api/profile/follow-requests/:requestId` | Decline follow request |
-| GET | `/api/profile/all-followers` | Get accepted followers (cursor pagination) |
-| GET | `/api/profile/all-following` | Get accepted following (cursor pagination) |
+| POST | `/api/follow/follow/:userId` | Send follow request |
+| DELETE | `/api/follow/follow/:userId` | Cancel request or unfollow |
+| GET | `/api/follow/follow-status/:userId` | Get relationship status |
+| GET | `/api/follow/follow-requests` | Get pending incoming requests |
+| POST | `/api/follow/follow-requests/:requestId/accept` | Accept follow request |
+| DELETE | `/api/follow/follow-requests/:requestId` | Decline follow request |
+| GET | `/api/follow/all-followers` | Get accepted followers (cursor pagination) |
+| GET | `/api/follow/all-following` | Get accepted following (cursor pagination) |
 
 ### Search (`/api`)
 
 | Method | Endpoint | Purpose |
 |---|---|---|
-| GET | `/api/profile/recent-searches` | Get recent searches |
-| POST | `/api/profile/recent-searches` | Add/update recent searched user |
-| DELETE | `/api/profile/recent-searches` | Clear all recent searches |
-| DELETE | `/api/profile/recent-searches/:userId` | Remove one recent searched user |
-| GET | `/api/profile/search-users` | Search public users |
+| GET | `/api/search/recent-searches` | Get recent searches |
+| POST | `/api/search/recent-searches` | Add/update recent searched user |
+| DELETE | `/api/search/recent-searches` | Clear all recent searches |
+| DELETE | `/api/search/recent-searches/:userId` | Remove one recent searched user |
+| GET | `/api/search/search-users` | Search public users |
 
 ### Tiles & Seed (`/api`)
 
 | Method | Endpoint | Purpose |
 |---|---|---|
-| GET | `/api/tiles` | Get default + user tiles |
-| POST | `/api/tiles/add` | Add custom tile |
-| DELETE | `/api/tiles/remove/:id` | Remove custom tile |
+| GET | `/api/tile` | Get default + user tiles |
+| POST | `/api/tile/add` | Add custom tile |
+| DELETE | `/api/tile/remove/:id` | Remove custom tile |
 | POST | `/api/seed/tiles` | Seed default tiles (if missing) |
 
 ### Utility

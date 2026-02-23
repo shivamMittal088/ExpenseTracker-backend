@@ -28,11 +28,11 @@ const decodeCursor = (value) => {
     }
 };
 /**
- * POST /profile/follow/:userId
+ * POST /follow/follow/:userId
  * - Requires userAuth
  * - Creates a follow request (pending)
  */
-followRouter.post("/profile/follow/:userId", userAuth_1.default, async (req, res) => {
+followRouter.post("/follow/follow/:userId", userAuth_1.default, async (req, res) => {
     try {
         if (!req.user) {
             return res.status(401).json({ message: "Not authenticated" });
@@ -66,23 +66,23 @@ followRouter.post("/profile/follow/:userId", userAuth_1.default, async (req, res
             ...(note ? { note } : {}),
         });
         (0, logger_1.logEvent)("info", "Follow request created", {
-            route: "POST /profile/follow/:userId",
+            route: "POST /follow/follow/:userId",
             userId: followerId,
             targetUserId,
         });
         return res.status(201).json({ status: follow.status });
     }
     catch (err) {
-        (0, logger_1.logApiError)(req, err, { route: "POST /profile/follow/:userId" });
+        (0, logger_1.logApiError)(req, err, { route: "POST /follow/follow/:userId" });
         return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
 });
 /**
- * DELETE /profile/follow/:userId
+ * DELETE /follow/follow/:userId
  * - Requires userAuth
  * - Cancels a pending follow request or unfollows an accepted user
  */
-followRouter.delete("/profile/follow/:userId", userAuth_1.default, async (req, res) => {
+followRouter.delete("/follow/follow/:userId", userAuth_1.default, async (req, res) => {
     try {
         if (!req.user) {
             return res.status(401).json({ message: "Not authenticated" });
@@ -102,7 +102,7 @@ followRouter.delete("/profile/follow/:userId", userAuth_1.default, async (req, r
             return res.status(404).json({ message: "Follow relationship not found" });
         }
         (0, logger_1.logEvent)("info", "Follow removed", {
-            route: "DELETE /profile/follow/:userId",
+            route: "DELETE /follow/follow/:userId",
             userId: followerId,
             targetUserId,
             previousStatus: deleted.status,
@@ -110,16 +110,16 @@ followRouter.delete("/profile/follow/:userId", userAuth_1.default, async (req, r
         return res.status(200).json({ status: "none" });
     }
     catch (err) {
-        (0, logger_1.logApiError)(req, err, { route: "DELETE /profile/follow/:userId" });
+        (0, logger_1.logApiError)(req, err, { route: "DELETE /follow/follow/:userId" });
         return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
 });
 /**
- * GET /profile/follow-status/:userId
+ * GET /follow/follow-status/:userId
  * - Requires userAuth
  * - Returns follow status to target user
  */
-followRouter.get("/profile/follow-status/:userId", userAuth_1.default, async (req, res) => {
+followRouter.get("/follow/follow-status/:userId", userAuth_1.default, async (req, res) => {
     try {
         if (!req.user) {
             return res.status(401).json({ message: "Not authenticated" });
@@ -137,16 +137,16 @@ followRouter.get("/profile/follow-status/:userId", userAuth_1.default, async (re
         return res.status(200).json({ status: follow.status });
     }
     catch (err) {
-        (0, logger_1.logApiError)(req, err, { route: "GET /profile/follow-status/:userId" });
+        (0, logger_1.logApiError)(req, err, { route: "GET /follow/follow-status/:userId" });
         return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
 });
 /**
- * GET /profile/follow-requests
+ * GET /follow/follow-requests
  * - Requires userAuth
  * - Returns pending follow requests for the logged-in user
  */
-followRouter.get("/profile/follow-requests", userAuth_1.default, async (req, res) => {
+followRouter.get("/follow/follow-requests", userAuth_1.default, async (req, res) => {
     try {
         if (!req.user) {
             return res.status(401).json({ message: "Not authenticated" });
@@ -174,16 +174,16 @@ followRouter.get("/profile/follow-requests", userAuth_1.default, async (req, res
         return res.status(200).json({ requests: results });
     }
     catch (err) {
-        (0, logger_1.logApiError)(req, err, { route: "GET /profile/follow-requests" });
+        (0, logger_1.logApiError)(req, err, { route: "GET /follow/follow-requests" });
         return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
 });
 /**
- * POST /profile/follow-requests/:requestId/accept
+ * POST /follow/follow-requests/:requestId/accept
  * - Requires userAuth
  * - Accepts a pending follow request
  */
-followRouter.post("/profile/follow-requests/:requestId/accept", userAuth_1.default, async (req, res) => {
+followRouter.post("/follow/follow-requests/:requestId/accept", userAuth_1.default, async (req, res) => {
     try {
         if (!req.user) {
             return res.status(401).json({ message: "Not authenticated" });
@@ -201,23 +201,23 @@ followRouter.post("/profile/follow-requests/:requestId/accept", userAuth_1.defau
             return res.status(404).json({ message: "Pending request not found" });
         }
         (0, logger_1.logEvent)("info", "Follow request accepted", {
-            route: "POST /profile/follow-requests/:requestId/accept",
+            route: "POST /follow/follow-requests/:requestId/accept",
             userId: req.user._id,
             requestId,
         });
         return res.status(200).json({ status: "accepted" });
     }
     catch (err) {
-        (0, logger_1.logApiError)(req, err, { route: "POST /profile/follow-requests/:requestId/accept" });
+        (0, logger_1.logApiError)(req, err, { route: "POST /follow/follow-requests/:requestId/accept" });
         return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
 });
 /**
- * DELETE /profile/follow-requests/:requestId
+ * DELETE /follow/follow-requests/:requestId
  * - Requires userAuth
  * - Declines a pending follow request
  */
-followRouter.delete("/profile/follow-requests/:requestId", userAuth_1.default, async (req, res) => {
+followRouter.delete("/follow/follow-requests/:requestId", userAuth_1.default, async (req, res) => {
     try {
         if (!req.user) {
             return res.status(401).json({ message: "Not authenticated" });
@@ -235,23 +235,23 @@ followRouter.delete("/profile/follow-requests/:requestId", userAuth_1.default, a
             return res.status(404).json({ message: "Pending request not found" });
         }
         (0, logger_1.logEvent)("info", "Follow request declined", {
-            route: "DELETE /profile/follow-requests/:requestId",
+            route: "DELETE /follow/follow-requests/:requestId",
             userId: req.user._id,
             requestId,
         });
         return res.status(200).json({ status: "declined" });
     }
     catch (err) {
-        (0, logger_1.logApiError)(req, err, { route: "DELETE /profile/follow-requests/:requestId" });
+        (0, logger_1.logApiError)(req, err, { route: "DELETE /follow/follow-requests/:requestId" });
         return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
 });
 /**
- * GET /profile/all-followers
+ * GET /follow/all-followers
  * - Requires userAuth
  * - Returns accepted followers for the logged-in user
  */
-followRouter.get("/profile/all-followers", userAuth_1.default, async (req, res) => {
+followRouter.get("/follow/all-followers", userAuth_1.default, async (req, res) => {
     try {
         if (!req.user) {
             return res.status(401).json({ message: "Not authenticated" });
@@ -305,16 +305,16 @@ followRouter.get("/profile/all-followers", userAuth_1.default, async (req, res) 
         return res.status(200).json({ followers: results, nextCursor });
     }
     catch (err) {
-        (0, logger_1.logApiError)(req, err, { route: "GET /profile/all-followers" });
+        (0, logger_1.logApiError)(req, err, { route: "GET /follow/all-followers" });
         return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
 });
 /**
- * GET /profile/all-following
+ * GET /follow/all-following
  * - Requires userAuth
  * - Returns accepted following for the logged-in user
  */
-followRouter.get("/profile/all-following", userAuth_1.default, async (req, res) => {
+followRouter.get("/follow/all-following", userAuth_1.default, async (req, res) => {
     try {
         if (!req.user) {
             return res.status(401).json({ message: "Not authenticated" });
@@ -368,7 +368,7 @@ followRouter.get("/profile/all-following", userAuth_1.default, async (req, res) 
         return res.status(200).json({ following: results, nextCursor });
     }
     catch (err) {
-        (0, logger_1.logApiError)(req, err, { route: "GET /profile/all-following" });
+        (0, logger_1.logApiError)(req, err, { route: "GET /follow/all-following" });
         return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
 });

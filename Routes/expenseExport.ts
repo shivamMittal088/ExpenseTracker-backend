@@ -7,7 +7,7 @@ import { logApiError, logEvent } from "../utils/logger";
 const expenseExportRouter = express.Router();
 
 // Export expenses to Excel (.xlsx)
-expenseExportRouter.get("/expenses/export/excel", userAuth, async (req: Request, res: Response) => {
+expenseExportRouter.get("/expenseExport/excel", userAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.user!._id;
     const { startDate, endDate } = req.query;
@@ -93,7 +93,7 @@ expenseExportRouter.get("/expenses/export/excel", userAuth, async (req: Request,
     res.setHeader("Content-Disposition", `attachment; filename=expenses-${dateStamp}.xlsx`);
 
     logEvent("info", "Expenses exported to Excel", {
-      route: "GET /expenses/export/excel",
+      route: "GET /expenseExport/excel",
       userId,
       count: rows.length,
       hasDateRange: Boolean(startDate && endDate),
@@ -102,7 +102,7 @@ expenseExportRouter.get("/expenses/export/excel", userAuth, async (req: Request,
 
     return res.status(200).send(fileBuffer);
   } catch (err) {
-    logApiError(req, err, { route: "GET /expenses/export/excel" });
+    logApiError(req, err, { route: "GET /expenseExport/excel" });
     return res.status(500).json({ message: "Failed to export expenses" });
   }
 });

@@ -10,7 +10,7 @@ const userAuth_1 = __importDefault(require("../Middlewares/userAuth"));
 const logger_1 = require("../utils/logger");
 const expenseAnalyticsRouter = express_1.default.Router();
 // Fetch expenses for date range (YYYY-MM-DD to YYYY-MM-DD)
-expenseAnalyticsRouter.get("/expenses/range", userAuth_1.default, async (req, res) => {
+expenseAnalyticsRouter.get("/expenseAnalytics/range", userAuth_1.default, async (req, res) => {
     try {
         const userId = req.user._id;
         const rawStartDate = typeof req.query.startDate === "string" ? req.query.startDate : "";
@@ -59,7 +59,7 @@ expenseAnalyticsRouter.get("/expenses/range", userAuth_1.default, async (req, re
             },
         ]);
         (0, logger_1.logEvent)("info", "Expense range fetched", {
-            route: "GET /expenses/range",
+            route: "GET /expenseAnalytics/range",
             userId,
             startDate: rawStartDate,
             endDate: rawEndDate,
@@ -76,12 +76,12 @@ expenseAnalyticsRouter.get("/expenses/range", userAuth_1.default, async (req, re
         });
     }
     catch (err) {
-        (0, logger_1.logApiError)(req, err, { route: "GET /expenses/range" });
+        (0, logger_1.logApiError)(req, err, { route: "GET /expenseAnalytics/range" });
         return res.status(500).json({ message: "Failed to fetch expense range" });
     }
 });
 // Detect recurring payments based on expense patterns
-expenseAnalyticsRouter.get("/expenses/recurring", userAuth_1.default, async (req, res) => {
+expenseAnalyticsRouter.get("/expenseAnalytics/recurring", userAuth_1.default, async (req, res) => {
     try {
         const userId = req.user._id;
         const debug = req.query.debug === "true";
@@ -218,7 +218,7 @@ expenseAnalyticsRouter.get("/expenses/recurring", userAuth_1.default, async (req
         const likelyRecurring = recurringWithFrequency.filter((item) => item.isLikelyRecurring);
         const totalMonthlyRecurring = likelyRecurring.reduce((sum, item) => sum + item.estimatedMonthlyAmount, 0);
         (0, logger_1.logEvent)("info", "Recurring payments fetched", {
-            route: "GET /expenses/recurring",
+            route: "GET /expenseAnalytics/recurring",
             userId,
             recurringCount: likelyRecurring.length,
             totalMonthlyRecurring,
@@ -256,12 +256,12 @@ expenseAnalyticsRouter.get("/expenses/recurring", userAuth_1.default, async (req
         });
     }
     catch (err) {
-        (0, logger_1.logApiError)(req, err, { route: "GET /expenses/recurring" });
+        (0, logger_1.logApiError)(req, err, { route: "GET /expenseAnalytics/recurring" });
         return res.status(500).json({ message: "Failed to detect recurring payments" });
     }
 });
 // Get payment mode breakdown (pie chart data)
-expenseAnalyticsRouter.get("/expenses/payment-breakdown", userAuth_1.default, async (req, res) => {
+expenseAnalyticsRouter.get("/expenseAnalytics/payment-breakdown", userAuth_1.default, async (req, res) => {
     try {
         const userId = req.user._id;
         const { period = "month" } = req.query;
@@ -333,7 +333,7 @@ expenseAnalyticsRouter.get("/expenses/payment-breakdown", userAuth_1.default, as
             };
         });
         (0, logger_1.logEvent)("info", "Payment breakdown fetched", {
-            route: "GET /expenses/payment-breakdown",
+            route: "GET /expenseAnalytics/payment-breakdown",
             userId,
             period,
             modesFound: data.length,
@@ -350,12 +350,12 @@ expenseAnalyticsRouter.get("/expenses/payment-breakdown", userAuth_1.default, as
         });
     }
     catch (err) {
-        (0, logger_1.logApiError)(req, err, { route: "GET /expenses/payment-breakdown" });
+        (0, logger_1.logApiError)(req, err, { route: "GET /expenseAnalytics/payment-breakdown" });
         return res.status(500).json({ message: "Failed to fetch payment breakdown" });
     }
 });
 // Get spending trends for graphs (daily, monthly, yearly views)
-expenseAnalyticsRouter.get("/expenses/spending-trends", userAuth_1.default, async (req, res) => {
+expenseAnalyticsRouter.get("/expenseAnalytics/spending-trends", userAuth_1.default, async (req, res) => {
     try {
         const userId = req.user._id;
         const { view = "daily" } = req.query;
@@ -465,7 +465,7 @@ expenseAnalyticsRouter.get("/expenses/spending-trends", userAuth_1.default, asyn
             ? Math.round(((lastPeriod.totalAmount - previousAvg) / previousAvg) * 100)
             : 0;
         (0, logger_1.logEvent)("info", "Spending trends fetched", {
-            route: "GET /expenses/spending-trends",
+            route: "GET /expenseAnalytics/spending-trends",
             userId,
             view,
             periodsReturned: filledTrends.length,
@@ -486,12 +486,12 @@ expenseAnalyticsRouter.get("/expenses/spending-trends", userAuth_1.default, asyn
         });
     }
     catch (err) {
-        (0, logger_1.logApiError)(req, err, { route: "GET /expenses/spending-trends" });
+        (0, logger_1.logApiError)(req, err, { route: "GET /expenseAnalytics/spending-trends" });
         return res.status(500).json({ message: "Failed to fetch spending trends" });
     }
 });
 // Get transaction count per day for heatmap
-expenseAnalyticsRouter.get("/expenses/heatmap/", userAuth_1.default, async (req, res) => {
+expenseAnalyticsRouter.get("/expenseAnalytics/heatmap/", userAuth_1.default, async (req, res) => {
     try {
         const userId = req.user._id;
         const { year } = req.query;
@@ -552,7 +552,7 @@ expenseAnalyticsRouter.get("/expenses/heatmap/", userAuth_1.default, async (req,
             },
         ]);
         (0, logger_1.logEvent)("info", "Heatmap data fetched", {
-            route: "GET /expenses/heatmap",
+            route: "GET /expenseAnalytics/heatmap",
             userId,
             year: targetYear,
             daysWithTransactions: heatmapData.length,
@@ -564,7 +564,7 @@ expenseAnalyticsRouter.get("/expenses/heatmap/", userAuth_1.default, async (req,
         });
     }
     catch (err) {
-        (0, logger_1.logApiError)(req, err, { route: "GET /expenses/heatmap" });
+        (0, logger_1.logApiError)(req, err, { route: "GET /expenseAnalytics/heatmap" });
         return res.status(500).json({ message: "Failed to load heatmap data" });
     }
 });

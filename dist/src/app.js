@@ -55,7 +55,7 @@ app.use(axiomLogger_1.axiomRequestLogger);
 // Serve static files from uploads directory
 app.use("/uploads", express_1.default.static(path_1.default.join(__dirname, "..", "uploads")));
 // Routes
-app.use("/api/auth/", auth_1.default);
+app.use("/api/", auth_1.default);
 app.use("/api/", profile_1.default);
 app.use("/api/", search_1.default);
 app.use("/api/", follow_1.default);

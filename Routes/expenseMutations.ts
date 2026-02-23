@@ -21,7 +21,7 @@ interface ExpenseUpdateDoc {
 const expenseMutationsRouter = express.Router();
 
 // Fetch hidden expenses for a given date (YYYY-MM-DD)
-expenseMutationsRouter.get("/expense/:date/hidden", userAuth, async (req: Request, res: Response) => {
+expenseMutationsRouter.get("/expenseMutations/:date/hidden", userAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.user!._id;
     const rawDate = Array.isArray(req.params.date) ? req.params.date[0] : req.params.date;
@@ -83,7 +83,7 @@ expenseMutationsRouter.get("/expense/:date/hidden", userAuth, async (req: Reques
     const totalAmount = totals[0]?.totalAmount || 0;
 
     logEvent("info", "Hidden expense list fetched", {
-      route: "GET /expense/:date/hidden",
+      route: "GET /expenseMutations/:date/hidden",
       userId,
       count: hiddenExpenses.length,
       date: rawDate,
@@ -99,14 +99,14 @@ expenseMutationsRouter.get("/expense/:date/hidden", userAuth, async (req: Reques
       },
     });
   } catch (err) {
-    logApiError(req, err, { route: "GET /expense/:date/hidden" });
+    logApiError(req, err, { route: "GET /expenseMutations/:date/hidden" });
     return res.status(500).json({ message: "Failed to load hidden expenses" });
   }
 });
 
 // Hide an expense (soft delete)
 expenseMutationsRouter.patch(
-  "/expense/:expenseId/hide",
+  "/expenseMutations/:expenseId/hide",
   userAuth,
   async (req: Request, res: Response) => {
     try {
@@ -115,7 +115,7 @@ expenseMutationsRouter.patch(
 
       if (!mongoose.isValidObjectId(expenseId)) {
         logEvent("warn", "Invalid expense id", {
-          route: "PATCH /expense/:expenseId/hide",
+          route: "PATCH /expenseMutations/:expenseId/hide",
           userId,
           expenseId,
         });
@@ -143,7 +143,7 @@ expenseMutationsRouter.patch(
         }
 
         logEvent("warn", "Expense not found for hide", {
-          route: "PATCH /expense/:expenseId/hide",
+          route: "PATCH /expenseMutations/:expenseId/hide",
           userId,
           expenseId,
         });
@@ -151,7 +151,7 @@ expenseMutationsRouter.patch(
       }
 
       logEvent("info", "Expense hidden", {
-        route: "PATCH /expense/:expenseId/hide",
+        route: "PATCH /expenseMutations/:expenseId/hide",
         userId,
         expenseId,
       });
@@ -161,7 +161,7 @@ expenseMutationsRouter.patch(
         data: hiddenExpense,
       });
     } catch (err) {
-      logApiError(req, err, { route: "PATCH /expense/:expenseId/hide" });
+      logApiError(req, err, { route: "PATCH /expenseMutations/:expenseId/hide" });
       return res.status(500).json({ message: "Failed to hide expense" });
     }
   }
@@ -169,7 +169,7 @@ expenseMutationsRouter.patch(
 
 // Restore a hidden expense
 expenseMutationsRouter.patch(
-  "/expense/:expenseId/restore",
+  "/expenseMutations/:expenseId/restore",
   userAuth,
   async (req: Request, res: Response) => {
     try {
@@ -178,7 +178,7 @@ expenseMutationsRouter.patch(
 
       if (!mongoose.isValidObjectId(expenseId)) {
         logEvent("warn", "Invalid expense id", {
-          route: "PATCH /expense/:expenseId/restore",
+          route: "PATCH /expenseMutations/:expenseId/restore",
           userId,
           expenseId,
         });
@@ -198,7 +198,7 @@ expenseMutationsRouter.patch(
 
       if (!restoredExpense) {
         logEvent("warn", "Hidden expense not found for restore", {
-          route: "PATCH /expense/:expenseId/restore",
+          route: "PATCH /expenseMutations/:expenseId/restore",
           userId,
           expenseId,
         });
@@ -206,7 +206,7 @@ expenseMutationsRouter.patch(
       }
 
       logEvent("info", "Expense restored", {
-        route: "PATCH /expense/:expenseId/restore",
+        route: "PATCH /expenseMutations/:expenseId/restore",
         userId,
         expenseId,
       });
@@ -216,7 +216,7 @@ expenseMutationsRouter.patch(
         data: restoredExpense,
       });
     } catch (err) {
-      logApiError(req, err, { route: "PATCH /expense/:expenseId/restore" });
+      logApiError(req, err, { route: "PATCH /expenseMutations/:expenseId/restore" });
       return res.status(500).json({ message: "Failed to restore expense" });
     }
   }
@@ -224,7 +224,7 @@ expenseMutationsRouter.patch(
 
 // Update an expense (amount, category, notes, payment_mode, occurredAt)
 expenseMutationsRouter.patch(
-  "/expense/:expenseId",
+  "/expenseMutations/:expenseId",
   userAuth,
   async (req: Request, res: Response) => {
     try {
@@ -233,7 +233,7 @@ expenseMutationsRouter.patch(
 
       if (!mongoose.isValidObjectId(expenseId)) {
         logEvent("warn", "Invalid expense id", {
-          route: "PATCH /expense/:expenseId",
+          route: "PATCH /expenseMutations/:expenseId",
           userId,
           expenseId,
         });
@@ -306,7 +306,7 @@ expenseMutationsRouter.patch(
 
       if (errors.length) {
         logEvent("warn", "Expense update validation failed", {
-          route: "PATCH /expense/:expenseId",
+          route: "PATCH /expenseMutations/:expenseId",
           userId,
           expenseId,
           errors,
@@ -316,7 +316,7 @@ expenseMutationsRouter.patch(
 
       if (Object.keys(updateDoc).length === 0) {
         logEvent("warn", "No updatable fields provided", {
-          route: "PATCH /expense/:expenseId",
+          route: "PATCH /expenseMutations/:expenseId",
           userId,
           expenseId,
         });
@@ -331,7 +331,7 @@ expenseMutationsRouter.patch(
 
       if (!updated) {
         logEvent("warn", "Expense not found", {
-          route: "PATCH /expense/:expenseId",
+          route: "PATCH /expenseMutations/:expenseId",
           userId,
           expenseId,
         });
@@ -339,7 +339,7 @@ expenseMutationsRouter.patch(
       }
 
       logEvent("info", "Expense updated", {
-        route: "PATCH /expense/:expenseId",
+        route: "PATCH /expenseMutations/:expenseId",
         userId,
         expenseId,
       });
@@ -349,7 +349,7 @@ expenseMutationsRouter.patch(
         data: updated,
       });
     } catch (err) {
-      logApiError(req, err, { route: "PATCH /expense/:expenseId" });
+      logApiError(req, err, { route: "PATCH /expenseMutations/:expenseId" });
       return res.status(500).json({ message: "Failed to update expense" });
     }
   }

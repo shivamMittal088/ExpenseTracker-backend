@@ -61,7 +61,7 @@ app.use(axiomRequestLogger);
 app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 
 // Routes
-app.use("/api/auth/", authRouter);
+app.use("/api/", authRouter);
 app.use("/api/",profileRouter);
 app.use("/api/", searchRouter);
 app.use("/api/", followRouter);

@@ -13,11 +13,11 @@ const DEFAULT_SEARCH_LIMIT = 8;
 const MAX_SEARCH_LIMIT = 25;
 const searchRouter = express_1.default.Router();
 /**
- * GET /profile/recent-searches
+ * GET /search/recent-searches
  * - Requires userAuth
  * - Returns the user's recent searched profiles
  */
-searchRouter.get("/profile/recent-searches", userAuth_1.default, async (req, res) => {
+searchRouter.get("/search/recent-searches", userAuth_1.default, async (req, res) => {
     try {
         if (!req.user) {
             return res.status(401).json({ message: "Not authenticated" });
@@ -41,16 +41,16 @@ searchRouter.get("/profile/recent-searches", userAuth_1.default, async (req, res
         return res.status(200).json({ recent });
     }
     catch (err) {
-        (0, logger_1.logApiError)(req, err, { route: "GET /profile/recent-searches" });
+        (0, logger_1.logApiError)(req, err, { route: "GET /search/recent-searches" });
         return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
 });
 /**
- * POST /profile/recent-searches
+ * POST /search/recent-searches
  * - Requires userAuth
  * - Adds a user to the recent search list (max 10)
  */
-searchRouter.post("/profile/recent-searches", userAuth_1.default, async (req, res) => {
+searchRouter.post("/search/recent-searches", userAuth_1.default, async (req, res) => {
     try {
         if (!req.user) {
             return res.status(401).json({ message: "Not authenticated" });
@@ -82,16 +82,16 @@ searchRouter.post("/profile/recent-searches", userAuth_1.default, async (req, re
         return res.status(200).json({ status: "ok" });
     }
     catch (err) {
-        (0, logger_1.logApiError)(req, err, { route: "POST /profile/recent-searches" });
+        (0, logger_1.logApiError)(req, err, { route: "POST /search/recent-searches" });
         return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
 });
 /**
- * DELETE /profile/recent-searches/:userId
+ * DELETE /search/recent-searches/:userId
  * - Requires userAuth
  * - Removes a user from the recent search list
  */
-searchRouter.delete("/profile/recent-searches", userAuth_1.default, async (req, res) => {
+searchRouter.delete("/search/recent-searches", userAuth_1.default, async (req, res) => {
     try {
         if (!req.user) {
             return res.status(401).json({ message: "Not authenticated" });
@@ -100,16 +100,16 @@ searchRouter.delete("/profile/recent-searches", userAuth_1.default, async (req, 
         return res.status(200).json({ status: "ok" });
     }
     catch (err) {
-        (0, logger_1.logApiError)(req, err, { route: "DELETE /profile/recent-searches" });
+        (0, logger_1.logApiError)(req, err, { route: "DELETE /search/recent-searches" });
         return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
 });
 /**
- * DELETE /profile/recent-searches/:userId
+ * DELETE /search/recent-searches/:userId
  * - Requires userAuth
  * - Removes a user from the recent search list
  */
-searchRouter.delete("/profile/recent-searches/:userId", userAuth_1.default, async (req, res) => {
+searchRouter.delete("/search/recent-searches/:userId", userAuth_1.default, async (req, res) => {
     try {
         if (!req.user) {
             return res.status(401).json({ message: "Not authenticated" });
@@ -123,16 +123,16 @@ searchRouter.delete("/profile/recent-searches/:userId", userAuth_1.default, asyn
         return res.status(200).json({ status: "ok" });
     }
     catch (err) {
-        (0, logger_1.logApiError)(req, err, { route: "DELETE /profile/recent-searches/:userId" });
+        (0, logger_1.logApiError)(req, err, { route: "DELETE /search/recent-searches/:userId" });
         return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
 });
 /**
- * GET /profile/search-users
+ * GET /search/search-users
  * - Requires auth
  * - Optional query param `q` (min 2 chars) filters by name/email/status
  */
-searchRouter.get("/profile/search-users", userAuth_1.default, async (req, res) => {
+searchRouter.get("/search/search-users", userAuth_1.default, async (req, res) => {
     try {
         if (!req.user) {
             return res.status(401).json({ message: "Not authenticated" });
@@ -174,7 +174,7 @@ searchRouter.get("/profile/search-users", userAuth_1.default, async (req, res) =
         return res.status(200).json({ query: rawQuery, results });
     }
     catch (err) {
-        (0, logger_1.logApiError)(req, err, { route: "GET /profile/search-users" });
+        (0, logger_1.logApiError)(req, err, { route: "GET /search/search-users" });
         return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
 });

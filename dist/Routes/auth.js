@@ -12,7 +12,7 @@ const logger_1 = require("../utils/logger");
 const authRouter = express_1.default.Router();
 const TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // 1 day
 /* ---------- Signup ---------- */
-authRouter.post("/signup", async (req, res) => {
+authRouter.post("/auth/signup", async (req, res) => {
     try {
         const { emailId, password, name } = req.body;
         const existingUser = await UserSchema_1.default.findOne({ emailId });
@@ -35,19 +35,19 @@ authRouter.post("/signup", async (req, res) => {
             expires: expiresAt,
         });
         (0, logger_1.logEvent)("info", "User signed up", {
-            route: "POST /signup",
+            route: "POST /auth/signup",
             userId: savedUser._id,
             emailId,
         });
         res.json({ message: "Signup successful", token });
     }
     catch (err) {
-        (0, logger_1.logApiError)(req, err, { route: "POST /signup" });
+        (0, logger_1.logApiError)(req, err, { route: "POST /auth/signup" });
         res.status(400).json({ err: err.message });
     }
 });
 /* ---------- Login ---------- */
-authRouter.post("/login", async (req, res) => {
+authRouter.post("/auth/login", async (req, res) => {
     try {
         const { emailId, password } = req.body;
         const user = await UserSchema_1.default.findOne({ emailId });
@@ -69,21 +69,21 @@ authRouter.post("/login", async (req, res) => {
         });
         const { password: _password, ...safeUser } = user.toObject();
         (0, logger_1.logEvent)("info", "User logged in", {
-            route: "POST /login",
+            route: "POST /auth/login",
             userId: user._id,
             emailId,
         });
         res.json({ ...safeUser, token });
     }
     catch (err) {
-        (0, logger_1.logApiError)(req, err, { route: "POST /login" });
+        (0, logger_1.logApiError)(req, err, { route: "POST /auth/login" });
         res.status(400).json({ err: err.message });
     }
 });
 /* ---------- Get Current User ---------- */
-authRouter.get("/me", userAuth_1.default, (req, res) => {
+authRouter.get("/auth/me", userAuth_1.default, (req, res) => {
     (0, logger_1.logEvent)("info", "Fetched current user", {
-        route: "GET /me",
+        route: "GET /auth/me",
         userId: req.user._id,
     });
     res.json({
@@ -93,22 +93,22 @@ authRouter.get("/me", userAuth_1.default, (req, res) => {
     });
 });
 /* ---------- Logout ---------- */
-authRouter.post("/logout", userAuth_1.default, async (req, res) => {
+authRouter.post("/auth/logout", userAuth_1.default, async (req, res) => {
     try {
         res.clearCookie("token");
         (0, logger_1.logEvent)("info", "User logged out", {
-            route: "POST /logout",
+            route: "POST /auth/logout",
             userId: req.user._id,
         });
         res.json({ message: "Logged out successfully" });
     }
     catch (err) {
-        (0, logger_1.logApiError)(req, err, { route: "POST /logout" });
+        (0, logger_1.logApiError)(req, err, { route: "POST /auth/logout" });
         res.status(400).json({ err: err.message });
     }
 });
 /* ---------- Update Password ---------- */
-authRouter.patch("/update/password", userAuth_1.default, async (req, res) => {
+authRouter.patch("/auth/update/password", userAuth_1.default, async (req, res) => {
     try {
         const userId = req.user._id;
         const { oldPassword, newPassword } = req.body;
@@ -125,13 +125,13 @@ authRouter.patch("/update/password", userAuth_1.default, async (req, res) => {
         await user.save();
         res.clearCookie("token");
         (0, logger_1.logEvent)("info", "User password updated", {
-            route: "PATCH /update/password",
+            route: "PATCH /auth/update/password",
             userId,
         });
         res.json({ message: "Password updated.  Please login again." });
     }
     catch (err) {
-        (0, logger_1.logApiError)(req, err, { route: "PATCH /update/password" });
+        (0, logger_1.logApiError)(req, err, { route: "PATCH /auth/update/password" });
         res.status(400).json({ err: err.message });
     }
 });

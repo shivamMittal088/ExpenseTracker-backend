@@ -43,7 +43,7 @@ const userAuth_1 = __importDefault(require("../Middlewares/userAuth"));
 const logger_1 = require("../utils/logger");
 const expenseExportRouter = express_1.default.Router();
 // Export expenses to Excel (.xlsx)
-expenseExportRouter.get("/expenses/export/excel", userAuth_1.default, async (req, res) => {
+expenseExportRouter.get("/expenseExport/excel", userAuth_1.default, async (req, res) => {
     try {
         const userId = req.user._id;
         const { startDate, endDate } = req.query;
@@ -114,7 +114,7 @@ expenseExportRouter.get("/expenses/export/excel", userAuth_1.default, async (req
         res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         res.setHeader("Content-Disposition", `attachment; filename=expenses-${dateStamp}.xlsx`);
         (0, logger_1.logEvent)("info", "Expenses exported to Excel", {
-            route: "GET /expenses/export/excel",
+            route: "GET /expenseExport/excel",
             userId,
             count: rows.length,
             hasDateRange: Boolean(startDate && endDate),
@@ -123,7 +123,7 @@ expenseExportRouter.get("/expenses/export/excel", userAuth_1.default, async (req
         return res.status(200).send(fileBuffer);
     }
     catch (err) {
-        (0, logger_1.logApiError)(req, err, { route: "GET /expenses/export/excel" });
+        (0, logger_1.logApiError)(req, err, { route: "GET /expenseExport/excel" });
         return res.status(500).json({ message: "Failed to export expenses" });
     }
 });

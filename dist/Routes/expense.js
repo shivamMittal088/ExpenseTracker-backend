@@ -218,7 +218,7 @@ expressRouter.get("/expense/:date", userAuth_1.default, async (req, res) => {
     }
 });
 // Fetch all expenses with cursor pagination
-expressRouter.get("/expenses/paged", userAuth_1.default, async (req, res) => {
+expressRouter.get("/expense/paged", userAuth_1.default, async (req, res) => {
     try {
         const userId = req.user._id;
         const cursorValue = typeof req.query.cursor === "string" ? req.query.cursor : "";
@@ -253,7 +253,7 @@ expressRouter.get("/expenses/paged", userAuth_1.default, async (req, res) => {
             ? encodeExpenseCursor({ occurredAt: new Date(last.occurredAt).toISOString(), id: String(last._id) })
             : null;
         (0, logger_1.logEvent)("info", "Expenses paged fetched", {
-            route: "GET /expenses/paged",
+            route: "GET /expense/paged",
             userId,
             count: expenses.length,
         });
@@ -264,7 +264,7 @@ expressRouter.get("/expenses/paged", userAuth_1.default, async (req, res) => {
         });
     }
     catch (err) {
-        (0, logger_1.logApiError)(req, err, { route: "GET /expenses/paged" });
+        (0, logger_1.logApiError)(req, err, { route: "GET /expense/paged" });
         return res.status(500).json({ message: "Failed to load expenses" });
     }
 });
