@@ -87,11 +87,30 @@ expressRouter.post("/expense/add", userAuth_1.default, async (req, res, next) =>
         if (notes && typeof notes !== "string") {
             errors.push("notes must be a string");
         }
-        // Use occurredAt from request if user picked a custom date/time, otherwise use current server time + IST offset
-        const IST_OFFSET_MS = 330 * 60 * 1000;
-        const occurredAtDate = occurredAt
-            ? new Date(occurredAt) // User selected date/time from calendar/timepicker
-            : new Date(Date.now() + IST_OFFSET_MS); // Default: current time in IST
+        const tzOffsetMinutes = parseInt(String(req.query.tzOffsetMinutes || "0"), 10) || 0;
+        const parseOccurredAt = (value) => {
+            if (typeof value !== "string" || !value.trim())
+                return null;
+            const raw = value.trim();
+            const hasTimezone = /([zZ]|[+-]\d{2}:\d{2})$/.test(raw);
+            if (hasTimezone) {
+                const parsed = new Date(raw);
+                return Number.isNaN(parsed.getTime()) ? null : parsed;
+            }
+            const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/);
+            if (!match) {
+                const parsed = new Date(raw);
+                return Number.isNaN(parsed.getTime()) ? null : parsed;
+            }
+            const [, y, mo, d, h, mi, s = "0"] = match;
+            const utcMs = Date.UTC(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(s), 0) + tzOffsetMinutes * 60 * 1000;
+            return new Date(utcMs);
+        };
+        // Use occurredAt from request if provided, otherwise current server time.
+        const occurredAtDate = occurredAt ? parseOccurredAt(occurredAt) : new Date();
+        if (occurredAt && !occurredAtDate) {
+            errors.push("occurredAt is invalid");
+        }
         if (errors.length) {
             (0, logger_1.logEvent)("warn", "Expense validation failed", {
                 route: "POST /expense/add",
@@ -109,7 +128,7 @@ expressRouter.post("/expense/add", userAuth_1.default, async (req, res, next) =>
             },
             notes,
             payment_mode: normalizedPaymentMode,
-            occurredAt: occurredAtDate,
+            occurredAt: occurredAtDate || new Date(),
             userId,
         };
         const newExpense = await ExpenseSchema_1.default.create(expenseDoc);
