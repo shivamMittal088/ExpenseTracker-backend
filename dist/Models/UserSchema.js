@@ -64,6 +64,10 @@ const UserSchema = new mongoose_1.Schema({
         type: Boolean,
         default: true,
     },
+    hideAmounts: {
+        type: Boolean,
+        default: false,
+    },
     recentSearches: {
         type: [
             {

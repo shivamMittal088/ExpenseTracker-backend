@@ -72,7 +72,7 @@ profileRouter.get(
 /**
  * PATCH /profile/update
  * - Requires userAuth middleware to populate req.user
- * - Updates allowed fields: name, statusMessage
+ * - Updates allowed fields: name, statusMessage, hideAmounts
  */
 profileRouter.patch(
   "/profile/update",
@@ -84,12 +84,18 @@ profileRouter.patch(
       }
 
       const loggedInUserId = req.user._id;
-      const { name, statusMessage } = req.body;
+      const { name, statusMessage, hideAmounts } = req.body;
 
       // Build update object with only allowed fields
       const updateData: Record<string, unknown> = {};
       if (name !== undefined) updateData.name = name;
       if (statusMessage !== undefined) updateData.statusMessage = statusMessage;
+      if (hideAmounts !== undefined) {
+        if (typeof hideAmounts !== "boolean") {
+          return res.status(400).json({ message: "hideAmounts must be a boolean" });
+        }
+        updateData.hideAmounts = hideAmounts;
+      }
 
       if (Object.keys(updateData).length === 0) {
         return res.status(400).json({ message: "No valid fields to update" });
