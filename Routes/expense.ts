@@ -270,7 +270,12 @@ expressRouter.get("/expense/:date", userAuth, async (req: Request, res: Response
       },
     ];
 
-    const [expenseTransactions, totals] = await Promise.all([
+    const hiddenBaseMatch: Record<string, unknown> = {
+      userId: new mongoose.Types.ObjectId(userId),
+      isHidden: true,
+    };
+
+    const [expenseTransactions, totals, hiddenTotals] = await Promise.all([
       Expense.aggregate([
         { $match: baseMatch },
         ...effectiveDateStages,
@@ -289,10 +294,21 @@ expressRouter.get("/expense/:date", userAuth, async (req: Request, res: Response
           },
         },
       ]),
+      Expense.aggregate([
+        { $match: hiddenBaseMatch },
+        ...effectiveDateStages,
+        {
+          $group: {
+            _id: null,
+            totalCount: { $sum: 1 },
+          },
+        },
+      ]),
     ]);
 
     const totalCount = totals[0]?.totalCount || 0;
     const totalAmount = totals[0]?.totalAmount || 0;
+    const hiddenCount = hiddenTotals[0]?.totalCount || 0;
     const totalPages = Math.max(1, Math.ceil(totalCount / limit));
 
     logEvent("info", "Expense list fetched", {
@@ -314,6 +330,7 @@ expressRouter.get("/expense/:date", userAuth, async (req: Request, res: Response
         totalCount,
         totalPages,
         totalAmount,
+        hiddenCount,
       },
     });
   } catch (err) {
