@@ -48,6 +48,15 @@ const ExpenseSchema = new Schema({
     occurredAt: {
         type: Date,
         default: Date.now
+    },
+    isHidden: {
+        type: Boolean,
+        default: false,
+        index: true,
+    },
+    hiddenAt: {
+        type: Date,
+        default: null,
     }
 }, { timestamps: true });
 /* Indexes for typical queries */
