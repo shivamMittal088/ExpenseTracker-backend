@@ -1,5 +1,6 @@
 import express, { Request, Response } from "express";
 import User from "../Models/UserSchema";
+import Follow from "../Models/FollowSchema";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import userAuth from "../Middlewares/userAuth";
@@ -44,13 +45,21 @@ authRouter.post("/auth/signup", async (req:  Request, res: Response) => {
       expires: expiresAt,
     });
 
+    const { password: _password, ...safeUser } = savedUser.toObject();
+
     logEvent("info", "User signed up", {
       route: "POST /auth/signup",
       userId: savedUser._id,
       emailId,
     });
 
-    res.json({ message: "Signup successful", token });
+    res.json({
+      message: "Signup successful",
+      ...safeUser,
+      followersCount: 0,
+      followingCount: 0,
+      token,
+    });
   } catch (err: any) {
     logApiError(req, err, { route: "POST /auth/signup" });
     res.status(400).json({ err: err.message });
@@ -91,7 +100,12 @@ authRouter.post("/auth/login", async (req:  Request, res: Response) => {
       expires: expiresAt,
     });
 
-    const { password: _password, ...safeUser } = user. toObject();
+    const { password: _password, ...safeUser } = user.toObject();
+
+    const [followersCount, followingCount] = await Promise.all([
+      Follow.countDocuments({ followingId: user._id, status: "accepted" }),
+      Follow.countDocuments({ followerId: user._id, status: "accepted" }),
+    ]);
 
     logEvent("info", "User logged in", {
       route: "POST /auth/login",
@@ -99,7 +113,7 @@ authRouter.post("/auth/login", async (req:  Request, res: Response) => {
       emailId,
     });
 
-    res.json({ ...safeUser, token });
+    res.json({ ...safeUser, followersCount, followingCount, token });
   } catch (err: any) {
     logApiError(req, err, { route: "POST /auth/login" });
     res.status(400).json({ err: err.message });

@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const UserSchema_1 = __importDefault(require("../Models/UserSchema"));
+const FollowSchema_1 = __importDefault(require("../Models/FollowSchema"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const userAuth_1 = __importDefault(require("../Middlewares/userAuth"));
@@ -34,12 +35,19 @@ authRouter.post("/auth/signup", async (req, res) => {
             secure: process.env.NODE_ENV === "production",
             expires: expiresAt,
         });
+        const { password: _password, ...safeUser } = savedUser.toObject();
         (0, logger_1.logEvent)("info", "User signed up", {
             route: "POST /auth/signup",
             userId: savedUser._id,
             emailId,
         });
-        res.json({ message: "Signup successful", token });
+        res.json({
+            message: "Signup successful",
+            ...safeUser,
+            followersCount: 0,
+            followingCount: 0,
+            token,
+        });
     }
     catch (err) {
         (0, logger_1.logApiError)(req, err, { route: "POST /auth/signup" });
@@ -68,12 +76,16 @@ authRouter.post("/auth/login", async (req, res) => {
             expires: expiresAt,
         });
         const { password: _password, ...safeUser } = user.toObject();
+        const [followersCount, followingCount] = await Promise.all([
+            FollowSchema_1.default.countDocuments({ followingId: user._id, status: "accepted" }),
+            FollowSchema_1.default.countDocuments({ followerId: user._id, status: "accepted" }),
+        ]);
         (0, logger_1.logEvent)("info", "User logged in", {
             route: "POST /auth/login",
             userId: user._id,
             emailId,
         });
-        res.json({ ...safeUser, token });
+        res.json({ ...safeUser, followersCount, followingCount, token });
     }
     catch (err) {
         (0, logger_1.logApiError)(req, err, { route: "POST /auth/login" });
