@@ -185,72 +185,85 @@ Local URLs:
 
 ---
 
-## 🔌 API Highlights
+## 🔌 Complete API Reference
 
-### Authentication
+All backend routes currently used by the app are listed below.
 
-<table align="center" border="1" cellpadding="8" cellspacing="0" width="100%">
-  <thead>
-    <tr>
-      <th>Method</th>
-      <th>Endpoint</th>
-      <th>Purpose</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr><td><code>POST</code></td><td><code>/api/auth/signup</code></td><td>Register a new user</td></tr>
-    <tr><td><code>POST</code></td><td><code>/api/auth/login</code></td><td>Authenticate user session</td></tr>
-    <tr><td><code>POST</code></td><td><code>/api/auth/logout</code></td><td>End active session</td></tr>
-    <tr><td><code>GET</code></td><td><code>/api/auth/me</code></td><td>Get currently logged-in user</td></tr>
-    <tr><td><code>PATCH</code></td><td><code>/api/auth/update/password</code></td><td>Change account password</td></tr>
-  </tbody>
-</table>
+### Authentication (`/api/auth`)
 
-### Expenses
+| Method | Endpoint | Purpose |
+|---|---|---|
+| POST | `/api/auth/signup` | Register a new user |
+| POST | `/api/auth/login` | Login and set auth cookie |
+| GET | `/api/auth/me` | Get current authenticated user |
+| POST | `/api/auth/logout` | Logout and clear auth cookie |
+| PATCH | `/api/auth/update/password` | Update password |
 
-<table align="center" border="1" cellpadding="8" cellspacing="0" width="100%">
-  <thead>
-    <tr>
-      <th>Method</th>
-      <th>Endpoint</th>
-      <th>Purpose</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr><td><code>POST</code></td><td><code>/api/expense/add</code></td><td>Add a new expense</td></tr>
-    <tr><td><code>GET</code></td><td><code>/api/expense/:date</code></td><td>Get expenses for a local date</td></tr>
-    <tr><td><code>GET</code></td><td><code>/api/expenses/paged</code></td><td>Cursor-paginated expense feed</td></tr>
-    <tr><td><code>PATCH</code></td><td><code>/api/expense/:expenseId</code></td><td>Update an expense</td></tr>
-    <tr><td><code>GET</code></td><td><code>/api/expenses/range</code></td><td>Filter expenses by date range</td></tr>
-    <tr><td><code>GET</code></td><td><code>/api/expenses/recurring</code></td><td>Recurring payment insights</td></tr>
-    <tr><td><code>GET</code></td><td><code>/api/expenses/payment-breakdown</code></td><td>Payment mode analytics</td></tr>
-    <tr><td><code>GET</code></td><td><code>/api/expenses/spending-trends</code></td><td>Trend analytics over time</td></tr>
-    <tr><td><code>GET</code></td><td><code>/api/expenses/heatmap</code></td><td>Heatmap-ready spending data</td></tr>
-    <tr><td><code>GET</code></td><td><code>/api/expenses/export/excel</code></td><td>Export filtered expenses to Excel</td></tr>
-  </tbody>
-</table>
+### Expenses (`/api`)
 
-### Profile + Follow + Search
+| Method | Endpoint | Purpose |
+|---|---|---|
+| POST | `/api/expense/add` | Create expense |
+| GET | `/api/expense/:date` | Get visible expenses for a local date |
+| GET | `/api/expense/:date/hidden` | Get hidden expenses for a local date |
+| GET | `/api/expenses/paged` | Cursor-paginated transactions feed |
+| PATCH | `/api/expense/:expenseId/hide` | Hide (soft-delete) an expense |
+| PATCH | `/api/expense/:expenseId/restore` | Restore a hidden expense |
+| PATCH | `/api/expense/:expenseId` | Update expense fields (amount/category/notes/payment_mode/occurredAt) |
+| GET | `/api/expenses/range` | Get expenses for date range |
+| GET | `/api/expenses/export/excel` | Export expenses to Excel |
+| GET | `/api/expenses/recurring` | Recurring payments analysis |
+| GET | `/api/expenses/payment-breakdown` | Payment-mode analytics |
+| GET | `/api/expenses/spending-trends` | Spending trends analytics |
+| GET | `/api/expenses/heatmap` | Heatmap data for calendar view |
 
-<table align="center" border="1" cellpadding="8" cellspacing="0" width="100%">
-  <thead>
-    <tr>
-      <th>Method</th>
-      <th>Endpoint</th>
-      <th>Purpose</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr><td><code>GET</code></td><td><code>/api/profile/view</code></td><td>Get current profile data</td></tr>
-    <tr><td><code>PATCH</code></td><td><code>/api/profile/update</code></td><td>Update name/status</td></tr>
-    <tr><td><code>PATCH</code></td><td><code>/api/profile/privacy</code></td><td>Update profile privacy</td></tr>
-    <tr><td><code>POST</code></td><td><code>/api/profile/upload-avatar</code></td><td>Upload profile photo</td></tr>
-    <tr><td><code>GET</code></td><td><code>/api/profile/search-users</code></td><td>Search users</td></tr>
-    <tr><td><code>GET</code></td><td><code>/api/profile/follow-requests</code></td><td>Fetch pending requests</td></tr>
-    <tr><td><code>POST</code></td><td><code>/api/profile/follow-requests/:requestId/accept</code></td><td>Accept follow request</td></tr>
-    <tr><td><code>DELETE</code></td><td><code>/api/profile/follow-requests/:requestId</code></td><td>Decline follow request</td></tr>
-  </tbody>
-</table>
+### Profile (`/api`)
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/profile/view` | Get logged-in profile |
+| PATCH | `/api/profile/update` | Update profile fields |
+| PATCH | `/api/profile/privacy` | Update `isPublic` privacy setting |
+| GET | `/api/profile/user/:userId` | Get public profile of another user |
+| POST | `/api/profile/upload-avatar` | Upload/update avatar |
+
+### Follow (`/api`)
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| POST | `/api/profile/follow/:userId` | Send follow request |
+| DELETE | `/api/profile/follow/:userId` | Cancel request or unfollow |
+| GET | `/api/profile/follow-status/:userId` | Get relationship status |
+| GET | `/api/profile/follow-requests` | Get pending incoming requests |
+| POST | `/api/profile/follow-requests/:requestId/accept` | Accept follow request |
+| DELETE | `/api/profile/follow-requests/:requestId` | Decline follow request |
+| GET | `/api/profile/all-followers` | Get accepted followers (cursor pagination) |
+| GET | `/api/profile/all-following` | Get accepted following (cursor pagination) |
+
+### Search (`/api`)
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/profile/recent-searches` | Get recent searches |
+| POST | `/api/profile/recent-searches` | Add/update recent searched user |
+| DELETE | `/api/profile/recent-searches` | Clear all recent searches |
+| DELETE | `/api/profile/recent-searches/:userId` | Remove one recent searched user |
+| GET | `/api/profile/search-users` | Search public users |
+
+### Tiles & Seed (`/api`)
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/tiles` | Get default + user tiles |
+| POST | `/api/tiles/add` | Add custom tile |
+| DELETE | `/api/tiles/remove/:id` | Remove custom tile |
+| POST | `/api/seed/tiles` | Seed default tiles (if missing) |
+
+### Utility
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/test` | Health check / server alive |
 
 ---
 
