@@ -271,3 +271,7 @@ Contributions are welcome:
 - [ ] Story-like user activity updates
 - [ ] PWA support
 - [ ] Additional performance monitoring dashboards
+- [ ] Add streak freeze support
+- [ ] Integrate Google Sign-In API
+- [ ] Add email verification code flow
+- [ ] Add cron jobs for scheduled maintenance tasks
