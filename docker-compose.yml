@@ -1,4 +1,16 @@
 services:
+  mongo:
+    image: mongo:7
+    container_name: expense-tracker-mongo
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   redis:
     image: redis:7-alpine
     container_name: expense-tracker-redis
@@ -17,13 +29,15 @@ services:
     container_name: expense-tracker-backend
     restart: unless-stopped
     depends_on:
+      mongo:
+        condition: service_healthy
       redis:
         condition: service_healthy
     environment:
       PORT: 5000
       NODE_ENV: production
       FRONTEND_ORIGIN: http://localhost:5173
-      MONGODB_URI: ${MONGODB_URI}
+      MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017/expense_tracker}
       REDIS_URL: redis://redis:6379
       AXIOM_TOKEN: ${AXIOM_TOKEN:-}
       AXIOM_ORG_ID: ${AXIOM_ORG_ID:-}
@@ -44,4 +58,5 @@ services:
       - "5173:80"
 
 volumes:
+  mongo_data:
   redis_data:
