@@ -7,17 +7,30 @@ const express_1 = __importDefault(require("express"));
 const mongoose_1 = require("mongoose");
 const UserSchema_1 = __importDefault(require("../Models/UserSchema"));
 const userAuth_1 = __importDefault(require("../Middlewares/userAuth"));
+const redisRateLimiter_1 = require("../Middlewares/redisRateLimiter");
 const logger_1 = require("../utils/logger");
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const DEFAULT_SEARCH_LIMIT = 8;
 const MAX_SEARCH_LIMIT = 25;
 const searchRouter = express_1.default.Router();
+const searchReadRateLimit = (0, redisRateLimiter_1.createRedisRateLimiter)({
+    keyPrefix: "ratelimit:search:read",
+    maxRequests: 60,
+    windowMs: 60 * 1000,
+    message: "Too many search requests. Please slow down.",
+});
+const searchMutationRateLimit = (0, redisRateLimiter_1.createRedisRateLimiter)({
+    keyPrefix: "ratelimit:search:mutate",
+    maxRequests: 30,
+    windowMs: 60 * 1000,
+    message: "Too many recent-search updates. Please slow down.",
+});
 /**
  * GET /search/recent-searches
  * - Requires userAuth
  * - Returns the user's recent searched profiles
  */
-searchRouter.get("/search/recent-searches", userAuth_1.default, async (req, res) => {
+searchRouter.get("/search/recent-searches", userAuth_1.default, searchReadRateLimit, async (req, res) => {
     try {
         if (!req.user) {
             return res.status(401).json({ message: "Not authenticated" });
@@ -50,7 +63,7 @@ searchRouter.get("/search/recent-searches", userAuth_1.default, async (req, res)
  * - Requires userAuth
  * - Adds a user to the recent search list (max 10)
  */
-searchRouter.post("/search/recent-searches", userAuth_1.default, async (req, res) => {
+searchRouter.post("/search/recent-searches", userAuth_1.default, searchMutationRateLimit, async (req, res) => {
     try {
         if (!req.user) {
             return res.status(401).json({ message: "Not authenticated" });
@@ -91,7 +104,7 @@ searchRouter.post("/search/recent-searches", userAuth_1.default, async (req, res
  * - Requires userAuth
  * - Removes a user from the recent search list
  */
-searchRouter.delete("/search/recent-searches", userAuth_1.default, async (req, res) => {
+searchRouter.delete("/search/recent-searches", userAuth_1.default, searchMutationRateLimit, async (req, res) => {
     try {
         if (!req.user) {
             return res.status(401).json({ message: "Not authenticated" });
@@ -109,7 +122,7 @@ searchRouter.delete("/search/recent-searches", userAuth_1.default, async (req, r
  * - Requires userAuth
  * - Removes a user from the recent search list
  */
-searchRouter.delete("/search/recent-searches/:userId", userAuth_1.default, async (req, res) => {
+searchRouter.delete("/search/recent-searches/:userId", userAuth_1.default, searchMutationRateLimit, async (req, res) => {
     try {
         if (!req.user) {
             return res.status(401).json({ message: "Not authenticated" });
@@ -132,7 +145,7 @@ searchRouter.delete("/search/recent-searches/:userId", userAuth_1.default, async
  * - Requires auth
  * - Optional query param `q` (min 2 chars) filters by name/email/status
  */
-searchRouter.get("/search/search-users", userAuth_1.default, async (req, res) => {
+searchRouter.get("/search/search-users", userAuth_1.default, searchReadRateLimit, async (req, res) => {
     try {
         if (!req.user) {
             return res.status(401).json({ message: "Not authenticated" });

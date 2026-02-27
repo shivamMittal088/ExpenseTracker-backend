@@ -9,13 +9,41 @@ const FollowSchema_1 = __importDefault(require("../Models/FollowSchema"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const userAuth_1 = __importDefault(require("../Middlewares/userAuth"));
+const redisRateLimiter_1 = require("../Middlewares/redisRateLimiter");
+const redisClient_1 = require("../config/redisClient");
 const logger_1 = require("../utils/logger");
 const authRouter = express_1.default.Router();
 const TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // 1 day
+const LOGIN_FAILURE_LIMIT = 5;
+const LOGIN_FAILURE_WINDOW_MS = 30 * 1000;
+const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
+const getLoginFailureKey = (req, emailId) => {
+    const ip = req.ip || req.socket.remoteAddress || "unknown";
+    return `ratelimit:auth:login:failed:${emailId}:${ip}`;
+};
+const getAttemptsRemaining = (failedAttempts) => {
+    return Math.max(0, LOGIN_FAILURE_LIMIT - failedAttempts);
+};
+const authSignupRateLimit = (0, redisRateLimiter_1.createRedisRateLimiter)({
+    keyPrefix: "ratelimit:auth:signup",
+    maxRequests: 5,
+    windowMs: 15 * 60 * 1000,
+    message: "Too many signup attempts. Please try again in a few minutes.",
+});
+const authPasswordUpdateRateLimit = (0, redisRateLimiter_1.createRedisRateLimiter)({
+    keyPrefix: "ratelimit:auth:update-password",
+    maxRequests: 8,
+    windowMs: 15 * 60 * 1000,
+    message: "Too many password update attempts. Please try again later.",
+});
 /* ---------- Signup ---------- */
-authRouter.post("/auth/signup", async (req, res) => {
+authRouter.post("/auth/signup", authSignupRateLimit, async (req, res) => {
     try {
-        const { emailId, password, name } = req.body;
+        const { password, name } = req.body;
+        const emailId = normalizeEmail(req.body?.emailId);
+        if (!name || !emailId || !password) {
+            return res.status(400).json({ message: "Name, email and password are required" });
+        }
         const existingUser = await UserSchema_1.default.findOne({ emailId });
         if (existingUser) {
             return res.status(400).json({ message: "Email already registered" });
@@ -57,14 +85,75 @@ authRouter.post("/auth/signup", async (req, res) => {
 /* ---------- Login ---------- */
 authRouter.post("/auth/login", async (req, res) => {
     try {
-        const { emailId, password } = req.body;
+        const { password } = req.body;
+        const emailId = normalizeEmail(req.body?.emailId);
+        if (!emailId || !password) {
+            return res.status(400).json({ message: "Email and password are required" });
+        }
+        const loginFailureKey = getLoginFailureKey(req, emailId);
+        if ((0, redisClient_1.isRedisReady)()) {
+            const client = (0, redisClient_1.getRedisClient)();
+            const failedAttempts = Number(await client.get(loginFailureKey) || 0);
+            if (failedAttempts >= LOGIN_FAILURE_LIMIT) {
+                const ttlMs = await client.pTTL(loginFailureKey);
+                const retryAfterSeconds = Math.max(1, Math.ceil((ttlMs > 0 ? ttlMs : LOGIN_FAILURE_WINDOW_MS) / 1000));
+                res.setHeader("Retry-After", String(retryAfterSeconds));
+                return res.status(429).json({
+                    message: "Too many incorrect login attempts. Retry after 30 seconds.",
+                    retryAfterSeconds,
+                    attemptsRemaining: 0,
+                });
+            }
+        }
         const user = await UserSchema_1.default.findOne({ emailId });
         if (!user) {
+            if ((0, redisClient_1.isRedisReady)()) {
+                const client = (0, redisClient_1.getRedisClient)();
+                const currentCount = await client.incr(loginFailureKey);
+                if (currentCount === 1) {
+                    await client.pExpire(loginFailureKey, LOGIN_FAILURE_WINDOW_MS);
+                }
+                if (currentCount >= LOGIN_FAILURE_LIMIT) {
+                    res.setHeader("Retry-After", "30");
+                    return res.status(429).json({
+                        message: "Too many incorrect login attempts. Retry after 30 seconds.",
+                        retryAfterSeconds: 30,
+                        attemptsRemaining: 0,
+                    });
+                }
+                return res.status(400).json({
+                    message: "Invalid credentials",
+                    attemptsRemaining: getAttemptsRemaining(currentCount),
+                });
+            }
             return res.status(400).json({ message: "Invalid credentials" });
         }
         const isMatch = await bcrypt_1.default.compare(password, user.password);
         if (!isMatch) {
+            if ((0, redisClient_1.isRedisReady)()) {
+                const client = (0, redisClient_1.getRedisClient)();
+                const currentCount = await client.incr(loginFailureKey);
+                if (currentCount === 1) {
+                    await client.pExpire(loginFailureKey, LOGIN_FAILURE_WINDOW_MS);
+                }
+                if (currentCount >= LOGIN_FAILURE_LIMIT) {
+                    res.setHeader("Retry-After", "30");
+                    return res.status(429).json({
+                        message: "Too many incorrect login attempts. Retry after 30 seconds.",
+                        retryAfterSeconds: 30,
+                        attemptsRemaining: 0,
+                    });
+                }
+                return res.status(400).json({
+                    message: "Invalid credentials",
+                    attemptsRemaining: getAttemptsRemaining(currentCount),
+                });
+            }
             return res.status(400).json({ message: "Invalid credentials" });
+        }
+        if ((0, redisClient_1.isRedisReady)()) {
+            const client = (0, redisClient_1.getRedisClient)();
+            await client.del(loginFailureKey);
         }
         // Generate new token
         const token = jsonwebtoken_1.default.sign({ _id: user._id }, "MYSecretKey", { expiresIn: "1d" });
@@ -120,7 +209,7 @@ authRouter.post("/auth/logout", userAuth_1.default, async (req, res) => {
     }
 });
 /* ---------- Update Password ---------- */
-authRouter.patch("/auth/update/password", userAuth_1.default, async (req, res) => {
+authRouter.patch("/auth/update/password", userAuth_1.default, authPasswordUpdateRateLimit, async (req, res) => {
     try {
         const userId = req.user._id;
         const { oldPassword, newPassword } = req.body;

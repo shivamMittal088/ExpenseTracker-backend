@@ -2,6 +2,7 @@ import express, { Request, Response } from "express";
 import { Types } from "mongoose";
 import User from "../Models/UserSchema";
 import userAuth from "../Middlewares/userAuth";
+import { createRedisRateLimiter } from "../Middlewares/redisRateLimiter";
 import { logApiError } from "../utils/logger";
 
 const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -9,6 +10,20 @@ const DEFAULT_SEARCH_LIMIT = 8;
 const MAX_SEARCH_LIMIT = 25;
 
 const searchRouter = express.Router();
+
+const searchReadRateLimit = createRedisRateLimiter({
+  keyPrefix: "ratelimit:search:read",
+  maxRequests: 60,
+  windowMs: 60 * 1000,
+  message: "Too many search requests. Please slow down.",
+});
+
+const searchMutationRateLimit = createRedisRateLimiter({
+  keyPrefix: "ratelimit:search:mutate",
+  maxRequests: 30,
+  windowMs: 60 * 1000,
+  message: "Too many recent-search updates. Please slow down.",
+});
 
 /**
  * GET /search/recent-searches
@@ -18,6 +33,7 @@ const searchRouter = express.Router();
 searchRouter.get(
   "/search/recent-searches",
   userAuth,
+  searchReadRateLimit,
   async (req: Request, res: Response) => {
     try {
       if (!req.user) {
@@ -59,6 +75,7 @@ searchRouter.get(
 searchRouter.post(
   "/search/recent-searches",
   userAuth,
+  searchMutationRateLimit,
   async (req: Request, res: Response) => {
     try {
       if (!req.user) {
@@ -118,6 +135,7 @@ searchRouter.post(
 searchRouter.delete(
   "/search/recent-searches",
   userAuth,
+  searchMutationRateLimit,
   async (req: Request, res: Response) => {
     try {
       if (!req.user) {
@@ -142,6 +160,7 @@ searchRouter.delete(
 searchRouter.delete(
   "/search/recent-searches/:userId",
   userAuth,
+  searchMutationRateLimit,
   async (req: Request, res: Response) => {
     try {
       if (!req.user) {
@@ -176,6 +195,7 @@ searchRouter.delete(
 searchRouter.get(
   "/search/search-users",
   userAuth,
+  searchReadRateLimit,
   async (req: Request, res: Response) => {
     try {
       if (!req.user) {

@@ -4,16 +4,49 @@ import Follow from "../Models/FollowSchema";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import userAuth from "../Middlewares/userAuth";
+import { createRedisRateLimiter } from "../Middlewares/redisRateLimiter";
+import { getRedisClient, isRedisReady } from "../config/redisClient";
 import { logApiError, logEvent } from "../utils/logger";
 
 const authRouter = express.Router();
 
 const TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // 1 day
+const LOGIN_FAILURE_LIMIT = 5;
+const LOGIN_FAILURE_WINDOW_MS = 30 * 1000;
+
+const normalizeEmail = (value: unknown): string => String(value || "").trim().toLowerCase();
+const getLoginFailureKey = (req: Request, emailId: string): string => {
+  const ip = req.ip || req.socket.remoteAddress || "unknown";
+  return `ratelimit:auth:login:failed:${emailId}:${ip}`;
+};
+
+const getAttemptsRemaining = (failedAttempts: number): number => {
+  return Math.max(0, LOGIN_FAILURE_LIMIT - failedAttempts);
+};
+
+const authSignupRateLimit = createRedisRateLimiter({
+  keyPrefix: "ratelimit:auth:signup",
+  maxRequests: 5,
+  windowMs: 15 * 60 * 1000,
+  message: "Too many signup attempts. Please try again in a few minutes.",
+});
+
+const authPasswordUpdateRateLimit = createRedisRateLimiter({
+  keyPrefix: "ratelimit:auth:update-password",
+  maxRequests: 8,
+  windowMs: 15 * 60 * 1000,
+  message: "Too many password update attempts. Please try again later.",
+});
 
 /* ---------- Signup ---------- */
-authRouter.post("/auth/signup", async (req:  Request, res: Response) => {
+authRouter.post("/auth/signup", authSignupRateLimit, async (req:  Request, res: Response) => {
   try {
-    const { emailId, password, name } = req.body;
+    const { password, name } = req.body;
+    const emailId = normalizeEmail(req.body?.emailId);
+
+    if (!name || !emailId || !password) {
+      return res.status(400).json({ message: "Name, email and password are required" });
+    }
 
     const existingUser = await User.findOne({ emailId });
     if (existingUser) {
@@ -72,16 +105,84 @@ authRouter.post("/auth/signup", async (req:  Request, res: Response) => {
 /* ---------- Login ---------- */
 authRouter.post("/auth/login", async (req:  Request, res: Response) => {
   try {
-    const { emailId, password } = req.body;
+    const { password } = req.body;
+    const emailId = normalizeEmail(req.body?.emailId);
+
+    if (!emailId || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
+    }
+
+    const loginFailureKey = getLoginFailureKey(req, emailId);
+
+    if (isRedisReady()) {
+      const client = getRedisClient();
+      const failedAttempts = Number(await client.get(loginFailureKey) || 0);
+      if (failedAttempts >= LOGIN_FAILURE_LIMIT) {
+        const ttlMs = await client.pTTL(loginFailureKey);
+        const retryAfterSeconds = Math.max(1, Math.ceil((ttlMs > 0 ? ttlMs : LOGIN_FAILURE_WINDOW_MS) / 1000));
+
+        res.setHeader("Retry-After", String(retryAfterSeconds));
+        return res.status(429).json({
+          message: "Too many incorrect login attempts. Retry after 30 seconds.",
+          retryAfterSeconds,
+          attemptsRemaining: 0,
+        });
+      }
+    }
 
     const user = await User.findOne({ emailId });
     if (!user) {
+      if (isRedisReady()) {
+        const client = getRedisClient();
+        const currentCount = await client.incr(loginFailureKey);
+        if (currentCount === 1) {
+          await client.pExpire(loginFailureKey, LOGIN_FAILURE_WINDOW_MS);
+        }
+        if (currentCount >= LOGIN_FAILURE_LIMIT) {
+          res.setHeader("Retry-After", "30");
+          return res.status(429).json({
+            message: "Too many incorrect login attempts. Retry after 30 seconds.",
+            retryAfterSeconds: 30,
+            attemptsRemaining: 0,
+          });
+        }
+
+        return res.status(400).json({
+          message: "Invalid credentials",
+          attemptsRemaining: getAttemptsRemaining(currentCount),
+        });
+      }
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
+      if (isRedisReady()) {
+        const client = getRedisClient();
+        const currentCount = await client.incr(loginFailureKey);
+        if (currentCount === 1) {
+          await client.pExpire(loginFailureKey, LOGIN_FAILURE_WINDOW_MS);
+        }
+        if (currentCount >= LOGIN_FAILURE_LIMIT) {
+          res.setHeader("Retry-After", "30");
+          return res.status(429).json({
+            message: "Too many incorrect login attempts. Retry after 30 seconds.",
+            retryAfterSeconds: 30,
+            attemptsRemaining: 0,
+          });
+        }
+
+        return res.status(400).json({
+          message: "Invalid credentials",
+          attemptsRemaining: getAttemptsRemaining(currentCount),
+        });
+      }
       return res.status(400).json({ message: "Invalid credentials" });
+    }
+
+    if (isRedisReady()) {
+      const client = getRedisClient();
+      await client.del(loginFailureKey);
     }
 
     // Generate new token
@@ -158,7 +259,7 @@ authRouter.post("/auth/logout", userAuth, async (req: Request, res:  Response) =
 
 
 /* ---------- Update Password ---------- */
-authRouter.patch("/auth/update/password", userAuth, async (req: Request, res: Response) => {
+authRouter.patch("/auth/update/password", userAuth, authPasswordUpdateRateLimit, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user._id;
     const { oldPassword, newPassword } = req.body;

@@ -141,6 +141,7 @@ Built for production-style usage with clean route structure, secure auth flows, 
 | File Upload | Multer |
 | Media Storage | Cloudinary |
 | Logging | Axiom (optional) |
+| Rate limiting | Redis |
 | Deployment | Vercel |
 
 ---
@@ -163,6 +164,7 @@ PORT=5000
 MONGODB_URI=mongodb://localhost:27017/expense-tracker
 NODE_ENV=development
 FRONTEND_ORIGIN=http://localhost:5173
+REDIS_URL=redis://localhost:6379
 
 # Optional: Axiom logging
 AXIOM_TOKEN=your-axiom-api-token
