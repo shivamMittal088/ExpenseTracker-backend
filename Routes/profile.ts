@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 import User from "../Models/UserSchema";
 import Follow from "../Models/FollowSchema";
-import userAuth from "../Middlewares/userAuth";
+import userAuth, { invalidateUserSession } from "../Middlewares/userAuth";
 import { IUser } from "../Models/UserSchema";
 import { logApiError, logEvent } from "../utils/logger";
 import { avatarUpload as upload } from "../config/multer";
@@ -111,6 +111,8 @@ profileRouter.patch(
         return res.status(404).json({ message: "User not found" });
       }
 
+      await invalidateUserSession(String(loggedInUserId));
+
       logEvent("info", "Profile updated", {
         route: "PATCH /profile/update",
         userId: loggedInUserId,
@@ -157,6 +159,8 @@ profileRouter.patch(
       if (!updatedProfile) {
         return res.status(404).json({ message: "User not found" });
       }
+
+      await invalidateUserSession(String(loggedInUserId));
 
       logEvent("info", "Privacy updated", {
         route: "PATCH /profile/privacy",

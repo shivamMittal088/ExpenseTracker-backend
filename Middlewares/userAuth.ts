@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import jwt, { JwtPayload } from "jsonwebtoken";
 import User from "../Models/UserSchema";
+import { getRedisClient, isRedisReady } from "../config/redisClient";
 
 /* ---- JWT Payload Type ---- */
 interface MyJwtPayload extends JwtPayload {
@@ -13,6 +14,8 @@ interface AuthRequest extends Request {
 }
 
 const JWT_SECRET = "MYSecretKey";
+const SESSION_CACHE_TTL = 300; // 5 minutes in seconds
+const getSessionKey = (userId: string) => `user:session:${userId}`;
 
 const userAuth = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -42,14 +45,43 @@ const userAuth = async (req: AuthRequest, res: Response, next: NextFunction) => 
       return res.status(401).json({ code: "INVALID_TOKEN" });
     }
 
-    // 5️⃣ Load user
-    const user = await User.findById(decoded._id);
+    // 3️⃣ Check Redis session cache
+    if (isRedisReady()) {
+      try {
+        const cached = await getRedisClient().get(getSessionKey(decoded._id));
+        if (cached) {
+          req.user = JSON.parse(cached);
+          return next();
+        }
+      } catch {
+        // Redis error → fall through to MongoDB
+      }
+    }
+
+    // 4️⃣ Cache miss or Redis down → load from MongoDB
+    const user = await User.findById(decoded._id)
+      .select("_id name emailId")
+      .lean();
     if (!user) {
       return res.status(401).json({ code: "INVALID_USER" });
     }
 
+    // Minimal object with only the fields routes actually use
+    const sessionUser = {
+      _id: String(user._id),
+      name: user.name,
+      emailId: user.emailId,
+    };
+
+    // 5️⃣ Write to Redis cache (fire-and-forget)
+    if (isRedisReady()) {
+      getRedisClient()
+        .set(getSessionKey(sessionUser._id), JSON.stringify(sessionUser), { EX: SESSION_CACHE_TTL })
+        .catch(() => {});
+    }
+
     // 6️⃣ Attach user to request
-    req.user = user;
+    req.user = sessionUser;
     next();
   } catch (err) {
     return res.status(401).json({ code: "AUTH_FAILED" });
@@ -57,3 +89,17 @@ const userAuth = async (req: AuthRequest, res: Response, next: NextFunction) => 
 };
 
 export default userAuth;
+
+/**
+ * Invalidate the cached session for a user.
+ * Call on: logout, password change, profile update, privacy toggle.
+ */
+export const invalidateUserSession = async (userId: string): Promise<void> => {
+  if (isRedisReady()) {
+    try {
+      await getRedisClient().del(getSessionKey(userId));
+    } catch {
+      // Silently ignore — next request will just hit MongoDB
+    }
+  }
+};

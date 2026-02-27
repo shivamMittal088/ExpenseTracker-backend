@@ -3,7 +3,7 @@ import User from "../Models/UserSchema";
 import Follow from "../Models/FollowSchema";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
-import userAuth from "../Middlewares/userAuth";
+import userAuth, { invalidateUserSession } from "../Middlewares/userAuth";
 import { createRedisRateLimiter } from "../Middlewares/redisRateLimiter";
 import { getRedisClient, isRedisReady } from "../config/redisClient";
 import { logApiError, logEvent } from "../utils/logger";
@@ -243,6 +243,7 @@ authRouter.get("/auth/me", userAuth, (req: Request, res: Response) => {
 authRouter.post("/auth/logout", userAuth, async (req: Request, res:  Response) => {
   try {
     res.clearCookie("token");
+    await invalidateUserSession(String((req as any).user._id));
 
     logEvent("info", "User logged out", {
       route: "POST /auth/logout",
@@ -280,6 +281,7 @@ authRouter.patch("/auth/update/password", userAuth, authPasswordUpdateRateLimit,
     await user.save();
 
     res.clearCookie("token");
+    await invalidateUserSession(String(userId));
 
     logEvent("info", "User password updated", {
       route: "PATCH /auth/update/password",
