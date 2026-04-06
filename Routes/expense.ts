@@ -159,6 +159,63 @@ expressRouter.post(
   }
 );
 
+// Fetch all expenses with cursor pagination
+expressRouter.get("/expense/paged", userAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!._id;
+    const cursorValue = typeof req.query.cursor === "string" ? req.query.cursor : "";
+    const cursor = cursorValue ? decodeExpenseCursor(cursorValue) : null;
+    if (cursorValue && !cursor) {
+      return res.status(400).json({ message: "Invalid cursor" });
+    }
+
+    const baseFilter: Record<string, unknown> = {
+      userId,
+      isHidden: { $ne: true },
+    };
+
+    const cursorFilter = cursor
+      ? {
+          $or: [
+            { occurredAt: { $lt: new Date(cursor.occurredAt) } },
+            {
+              occurredAt: new Date(cursor.occurredAt),
+              _id: { $lt: new mongoose.Types.ObjectId(cursor.id) },
+            },
+          ],
+        }
+      : {};
+
+    const expenses = await Expense.find({
+      ...baseFilter,
+      ...cursorFilter,
+    })
+      .sort({ occurredAt: -1, _id: -1 })
+      .limit(EXPENSE_PAGE_SIZE)
+      .lean();
+
+    const last = expenses[expenses.length - 1];
+    const nextCursor = last && expenses.length === EXPENSE_PAGE_SIZE
+      ? encodeExpenseCursor({ occurredAt: new Date(last.occurredAt).toISOString(), id: String(last._id) })
+      : null;
+
+    logEvent("info", "Expenses paged fetched", {
+      route: "GET /expense/paged",
+      userId,
+      count: expenses.length,
+    });
+
+    return res.json({
+      message: "Expenses fetched",
+      data: expenses,
+      nextCursor,
+    });
+  } catch (err) {
+    logApiError(req, err as Error, { route: "GET /expense/paged" });
+    return res.status(500).json({ message: "Failed to load expenses" });
+  }
+});
+
 // Fetch expenses for a given date (YYYY-MM-DD)
 expressRouter.get("/expense/:date", userAuth, async (req: Request, res: Response) => {
   try {
@@ -268,63 +325,6 @@ expressRouter.get("/expense/:date", userAuth, async (req: Request, res: Response
     });
   } catch (err) {
     logApiError(req, err, { route: "GET /expense/:date" });
-    return res.status(500).json({ message: "Failed to load expenses" });
-  }
-});
-
-// Fetch all expenses with cursor pagination
-expressRouter.get("/expense/paged", userAuth, async (req: Request, res: Response) => {
-  try {
-    const userId = req.user!._id;
-    const cursorValue = typeof req.query.cursor === "string" ? req.query.cursor : "";
-    const cursor = cursorValue ? decodeExpenseCursor(cursorValue) : null;
-    if (cursorValue && !cursor) {
-      return res.status(400).json({ message: "Invalid cursor" });
-    }
-
-    const baseFilter: Record<string, unknown> = {
-      userId,
-      isHidden: { $ne: true },
-    };
-
-    const cursorFilter = cursor
-      ? {
-          $or: [
-            { occurredAt: { $lt: new Date(cursor.occurredAt) } },
-            {
-              occurredAt: new Date(cursor.occurredAt),
-              _id: { $lt: new mongoose.Types.ObjectId(cursor.id) },
-            },
-          ],
-        }
-      : {};
-
-    const expenses = await Expense.find({
-      ...baseFilter,
-      ...cursorFilter,
-    })
-      .sort({ occurredAt: -1, _id: -1 })
-      .limit(EXPENSE_PAGE_SIZE)
-      .lean();
-
-    const last = expenses[expenses.length - 1];
-    const nextCursor = last && expenses.length === EXPENSE_PAGE_SIZE
-      ? encodeExpenseCursor({ occurredAt: new Date(last.occurredAt).toISOString(), id: String(last._id) })
-      : null;
-
-    logEvent("info", "Expenses paged fetched", {
-      route: "GET /expense/paged",
-      userId,
-      count: expenses.length,
-    });
-
-    return res.json({
-      message: "Expenses fetched",
-      data: expenses,
-      nextCursor,
-    });
-  } catch (err) {
-    logApiError(req, err as Error, { route: "GET /expense/paged" });
     return res.status(500).json({ message: "Failed to load expenses" });
   }
 });
