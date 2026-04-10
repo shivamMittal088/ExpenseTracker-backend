@@ -38,6 +38,7 @@ Built for production-style usage with clean route structure, secure auth flows, 
 - Implemented **session-based authentication** with **centralized logging** for API monitoring and error tracking.
 - Built scalable followers APIs using **cursor-based pagination** with **infinite scroll** and **private account handling**.
 - Optimized frontend performance using **route/component lazy loading** and **modal prefetching**, reducing bundle size and improving **Lighthouse scores**.
+- Implemented **IndexedDB-based offline caching** for expense category tiles using the `idb` library, enabling offline access to categories.
 - Enhanced efficiency by **debouncing frequent state updates** to minimize redundant API calls and configured secure profile photo uploads using **Multer + Cloudinary** storage.
 - Built **data-driven APIs** for recurring payments, expense history, advanced filtering, and spending trend analysis, including an interactive **expense heatmap** for financial insights.
 - Added **Excel summary transactions download support** with **date-range filtering** for reporting workflows.
