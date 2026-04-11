@@ -1,6 +1,5 @@
 import express, { Request, Response } from "express";
 import User from "../Models/UserSchema";
-import Follow from "../Models/FollowSchema";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import userAuth, { invalidateUserSession } from "../Middlewares/userAuth";
@@ -89,8 +88,6 @@ authRouter.post("/auth/signup", authSignupRateLimit, async (req:  Request, res: 
     res.json({
       message: "Signup successful",
       ...safeUser,
-      followersCount: 0,
-      followingCount: 0,
       token,
     });
   } catch (err: any) {
@@ -203,18 +200,13 @@ authRouter.post("/auth/login", async (req:  Request, res: Response) => {
 
     const { password: _password, ...safeUser } = user.toObject();
 
-    const [followersCount, followingCount] = await Promise.all([
-      Follow.countDocuments({ followingId: user._id, status: "accepted" }),
-      Follow.countDocuments({ followerId: user._id, status: "accepted" }),
-    ]);
-
     logEvent("info", "User logged in", {
       route: "POST /auth/login",
       userId: user._id,
       emailId,
     });
 
-    res.json({ ...safeUser, followersCount, followingCount, token });
+    res.json({ ...safeUser, token });
   } catch (err: any) {
     logApiError(req, err, { route: "POST /auth/login" });
     res.status(400).json({ err: err.message });

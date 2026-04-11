@@ -36,7 +36,7 @@ Built for production-style usage with clean route structure, secure auth flows, 
 ## 🧠 Engineering Insights
 
 - Implemented **session-based authentication** with **centralized logging** for API monitoring and error tracking.
-- Built scalable followers APIs using **cursor-based pagination** with **infinite scroll** and **private account handling**.
+- Built scalable expense APIs with **cursor-based pagination** and **infinite scroll**.
 - Optimized frontend performance using **route/component lazy loading** and **modal prefetching**, reducing bundle size and improving **Lighthouse scores**.
 - Implemented **IndexedDB-based offline caching** for expense category tiles using the `idb` library, enabling offline access to categories.
 - Enhanced efficiency by **debouncing frequent state updates** to minimize redundant API calls and configured secure profile photo uploads using **Multer + Cloudinary** storage.
@@ -122,7 +122,7 @@ Built for production-style usage with clean route structure, secure auth flows, 
 | 🔐 **Auth + Sessions** | JWT cookie auth, signup/login/logout, password update, session safety |
 | 📊 **Analytics APIs** | Recurring payments, payment breakdown, spending trends, heatmap insights |
 | 📄 **Export to Excel** | Date-range-based Excel export for receipt/report workflows |
-| 👥 **Social Graph** | Follow requests, accept/decline flow, followers/following APIs |
+| 👥 **User Search** | Search users, view public profiles, recent searches |
 | 🧭 **Pagination Strategy** | Cursor-based APIs for scalable feeds + offset-style day feed support |
 | 🖼️ **Media Uploads** | Multer validation + Cloudinary storage for profile photos |
 | ⚡ **Performance-Oriented** | Supports lazy-loading architecture and reduced API churn patterns |
@@ -268,32 +268,7 @@ All backend routes currently used by the app are listed below.
 |---|---|---|
 | GET | `/api/profile/view` | Get logged-in profile |
 | PATCH | `/api/profile/update` | Update profile fields |
-| PATCH | `/api/profile/privacy` | Update `isPublic` privacy setting |
-| GET | `/api/profile/user/:userId` | Get public profile of another user |
 | POST | `/api/profile/upload-avatar` | Upload/update avatar |
-
-### Follow (`/api`)
-
-| Method | Endpoint | Purpose |
-|---|---|---|
-| POST | `/api/follow/follow/:userId` | Send follow request |
-| DELETE | `/api/follow/follow/:userId` | Cancel request or unfollow |
-| GET | `/api/follow/follow-status/:userId` | Get relationship status |
-| GET | `/api/follow/follow-requests` | Get pending incoming requests |
-| POST | `/api/follow/follow-requests/:requestId/accept` | Accept follow request |
-| DELETE | `/api/follow/follow-requests/:requestId` | Decline follow request |
-| GET | `/api/follow/all-followers` | Get accepted followers (cursor pagination) |
-| GET | `/api/follow/all-following` | Get accepted following (cursor pagination) |
-
-### Search (`/api`)
-
-| Method | Endpoint | Purpose |
-|---|---|---|
-| GET | `/api/search/recent-searches` | Get recent searches |
-| POST | `/api/search/recent-searches` | Add/update recent searched user |
-| DELETE | `/api/search/recent-searches` | Clear all recent searches |
-| DELETE | `/api/search/recent-searches/:userId` | Remove one recent searched user |
-| GET | `/api/search/search-users` | Search public users |
 
 ### Tiles & Seed (`/api`)
 

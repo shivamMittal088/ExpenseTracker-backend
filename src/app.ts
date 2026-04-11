@@ -6,8 +6,6 @@ import path from "path";
 import { axiomRequestLogger } from "../Middlewares/axiomLogger";
 import authRouter from "../Routes/auth";
 import profileRouter from "../Routes/profile";
-import searchRouter from "../Routes/search";
-import followRouter from "../Routes/follow";
 import expenseRouter from "../Routes/expense";
 import expenseAnalyticsRouter from "../Routes/expenseAnalytics";
 import expenseExportRouter from "../Routes/expenseExport";
@@ -63,8 +61,6 @@ app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 // Routes
 app.use("/api/", authRouter);
 app.use("/api/",profileRouter);
-app.use("/api/", searchRouter);
-app.use("/api/", followRouter);
 app.use("/api/",expenseRouter);
 app.use("/api/", expenseAnalyticsRouter);
 app.use("/api/", expenseExportRouter);

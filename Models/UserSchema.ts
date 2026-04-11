@@ -7,9 +7,7 @@ export interface IUser extends Document {
   password: string;
   photoURL?: string;
   statusMessage?: string;
-  isPublic: boolean;
   hideAmounts: boolean;
-  recentSearches: { userId: Schema.Types.ObjectId; searchedAt: Date }[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -46,38 +44,14 @@ const UserSchema = new Schema<IUser>(
     //   default : `Hi , I am ${name},`
     },
 
-    isPublic: {
-      type: Boolean,
-      default: true,
-    },
-
     hideAmounts: {
       type: Boolean,
       default: false,
-    },
-
-    recentSearches: {
-      type: [
-        {
-          userId: {
-            type: Schema.Types.ObjectId,
-            ref: "User",
-            required: true,
-          },
-          searchedAt: {
-            type: Date,
-            default: Date.now,
-          },
-        },
-      ],
-      default: [],
     },
 
   },
   { timestamps: true } // adds createdAt & updatedAt 
 );
 
-// Support name/email lookups for search
-UserSchema.index({ name: "text", emailId: "text" });
 
 export default mongoose.model<IUser>("User", UserSchema);

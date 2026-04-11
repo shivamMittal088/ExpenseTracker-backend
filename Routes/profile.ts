@@ -2,7 +2,6 @@ import express, { Request, Response } from "express";
 import path from "path";
 import fs from "fs";
 import User from "../Models/UserSchema";
-import Follow from "../Models/FollowSchema";
 import userAuth, { invalidateUserSession } from "../Middlewares/userAuth";
 import { IUser } from "../Models/UserSchema";
 import { logApiError, logEvent } from "../utils/logger";
@@ -45,23 +44,12 @@ profileRouter.get(
         return res.status(404).json({ message: "User not found" });
       }
 
-      const [followersCount, followingCount] = await Promise.all([
-        Follow.countDocuments({ followingId: loggedInUserId, status: "accepted" }),
-        Follow.countDocuments({ followerId: loggedInUserId, status: "accepted" }),
-      ]);
-
-      const profileWithDefaults = {
-        ...profile,
-        followersCount,
-        followingCount,
-      };
-
       logEvent("info", "Profile fetched", {
         route: "GET /profile/view",
         userId: loggedInUserId,
       });
 
-      return res.status(200).json(profileWithDefaults);
+      return res.status(200).json(profile);
     } catch (err: any) {
       logApiError(req, err, { route: "GET /profile/view" });
       return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
@@ -122,102 +110,6 @@ profileRouter.patch(
       return res.status(200).json(updatedProfile);
     } catch (err: any) {
       logApiError(req, err, { route: "PATCH /profile/update" });
-      return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
-    }
-  }
-);
-
-/**
- * PATCH /profile/privacy
- * - Requires userAuth middleware
- * - Updates account privacy (isPublic)
- */
-profileRouter.patch(
-  "/profile/privacy",
-  userAuth,
-  async (req: Request, res: Response) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ message: "Not authenticated" });
-      }
-
-      const loggedInUserId = req.user._id;
-      const { isPublic } = req.body as { isPublic?: boolean };
-
-      if (typeof isPublic !== "boolean") {
-        return res.status(400).json({ message: "isPublic must be a boolean" });
-      }
-
-      const updatedProfile = await User.findByIdAndUpdate(
-        loggedInUserId,
-        { $set: { isPublic } },
-        { new: true, runValidators: true }
-      )
-        .select("-password")
-        .lean();
-
-      if (!updatedProfile) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      await invalidateUserSession(String(loggedInUserId));
-
-      logEvent("info", "Privacy updated", {
-        route: "PATCH /profile/privacy",
-        userId: loggedInUserId,
-        isPublic,
-      });
-
-      return res.status(200).json(updatedProfile);
-    } catch (err: any) {
-      logApiError(req, err, { route: "PATCH /profile/privacy" });
-      return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
-    }
-  }
-);
-
-/**
- * GET /profile/user/:userId
- * - Requires userAuth
- * - Returns minimal public profile info for a user
- */
-profileRouter.get(
-  "/profile/user/:userId",
-  userAuth,
-  async (req: Request, res: Response) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ message: "Not authenticated" });
-      }
-
-      const { userId } = req.params;
-
-      const user = await User.findById(userId)
-        .select("name emailId photoURL statusMessage createdAt")
-        .lean();
-
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      const [followersCount, followingCount] = await Promise.all([
-        Follow.countDocuments({ followingId: userId, status: "accepted" }),
-        Follow.countDocuments({ followerId: userId, status: "accepted" }),
-      ]);
-
-      logEvent("info", "Public profile fetched", {
-        route: "GET /profile/user/:userId",
-        userId: req.user._id,
-        targetUserId: userId,
-      });
-
-      return res.status(200).json({
-        ...user,
-        followersCount,
-        followingCount,
-      });
-    } catch (err: any) {
-      logApiError(req, err, { route: "GET /profile/user/:userId" });
       return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
   }
