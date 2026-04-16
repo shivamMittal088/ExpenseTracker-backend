@@ -11,14 +11,13 @@ const path_1 = __importDefault(require("path"));
 const axiomLogger_1 = require("../Middlewares/axiomLogger");
 const auth_1 = __importDefault(require("../Routes/auth"));
 const profile_1 = __importDefault(require("../Routes/profile"));
-const search_1 = __importDefault(require("../Routes/search"));
-const follow_1 = __importDefault(require("../Routes/follow"));
 const expense_1 = __importDefault(require("../Routes/expense"));
 const expenseAnalytics_1 = __importDefault(require("../Routes/expenseAnalytics"));
 const expenseExport_1 = __importDefault(require("../Routes/expenseExport"));
 const expenseMutations_1 = __importDefault(require("../Routes/expenseMutations"));
 const seed_1 = __importDefault(require("../Routes/seed"));
 const tile_1 = __importDefault(require("../Routes/tile"));
+const push_1 = __importDefault(require("../Routes/push"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
@@ -57,14 +56,13 @@ app.use("/uploads", express_1.default.static(path_1.default.join(__dirname, ".."
 // Routes
 app.use("/api/", auth_1.default);
 app.use("/api/", profile_1.default);
-app.use("/api/", search_1.default);
-app.use("/api/", follow_1.default);
 app.use("/api/", expense_1.default);
 app.use("/api/", expenseAnalytics_1.default);
 app.use("/api/", expenseExport_1.default);
 app.use("/api/", expenseMutations_1.default);
 app.use("/api/", seed_1.default);
 app.use("/api/", tile_1.default);
+app.use("/api/", push_1.default);
 app.get("/test", (req, res) => {
     res.send("Server alive");
 });

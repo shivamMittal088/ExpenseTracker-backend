@@ -6,16 +6,24 @@ import { logApiError } from "../utils/logger";
 
 const pushRouter = express.Router();
 
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
-const VAPID_EMAIL = process.env.VAPID_EMAIL;
+/**
+ * Read VAPID config lazily at request time so that dotenv load order
+ * at module startup never causes false "not configured" results.
+ */
+function getVapidConfig(): { publicKey: string; privateKey: string; email: string } | null {
+  const publicKey = process.env.VAPID_PUBLIC_KEY;
+  const privateKey = process.env.VAPID_PRIVATE_KEY;
+  const email = process.env.VAPID_EMAIL;
+  if (!publicKey || !privateKey || !email) return null;
+  return { publicKey, privateKey, email };
+}
 
-const vapidConfigured = Boolean(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY && VAPID_EMAIL);
-
-if (vapidConfigured) {
-  webpush.setVapidDetails(VAPID_EMAIL!, VAPID_PUBLIC_KEY!, VAPID_PRIVATE_KEY!);
-} else {
-  console.warn("[push] VAPID environment variables are not set — push notification routes will return 503.");
+/** Initialise web-push with current env vars and return the config, or null. */
+function initWebPush() {
+  const config = getVapidConfig();
+  if (!config) return null;
+  webpush.setVapidDetails(config.email, config.publicKey, config.privateKey);
+  return config;
 }
 
 // GET /api/push/vapid-public-key
@@ -23,11 +31,12 @@ if (vapidConfigured) {
 pushRouter.get(
   "/push/vapid-public-key",
   (_req: Request, res: Response) => {
-    if (!vapidConfigured) {
+    const config = getVapidConfig();
+    if (!config) {
       res.status(503).json({ message: "Push notifications are not configured on the server." });
       return;
     }
-    res.json({ publicKey: VAPID_PUBLIC_KEY });
+    res.json({ publicKey: config.publicKey });
   },
 );
 
@@ -91,7 +100,8 @@ pushRouter.delete(
 // POST /api/push/test
 // Sends a test push notification to the authenticated user (dev use only)
 pushRouter.post("/push/test", userAuth, async (req: Request, res: Response) => {
-  if (!vapidConfigured) {
+  const config = initWebPush();
+  if (!config) {
     res.status(503).json({ message: "Push notifications are not configured on the server." });
     return;
   }

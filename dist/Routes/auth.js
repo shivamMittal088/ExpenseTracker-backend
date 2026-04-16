@@ -1,14 +1,46 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const UserSchema_1 = __importDefault(require("../Models/UserSchema"));
-const FollowSchema_1 = __importDefault(require("../Models/FollowSchema"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const bcrypt_1 = __importDefault(require("bcrypt"));
-const userAuth_1 = __importDefault(require("../Middlewares/userAuth"));
+const userAuth_1 = __importStar(require("../Middlewares/userAuth"));
 const redisRateLimiter_1 = require("../Middlewares/redisRateLimiter");
 const redisClient_1 = require("../config/redisClient");
 const logger_1 = require("../utils/logger");
@@ -72,8 +104,6 @@ authRouter.post("/auth/signup", authSignupRateLimit, async (req, res) => {
         res.json({
             message: "Signup successful",
             ...safeUser,
-            followersCount: 0,
-            followingCount: 0,
             token,
         });
     }
@@ -165,16 +195,12 @@ authRouter.post("/auth/login", async (req, res) => {
             expires: expiresAt,
         });
         const { password: _password, ...safeUser } = user.toObject();
-        const [followersCount, followingCount] = await Promise.all([
-            FollowSchema_1.default.countDocuments({ followingId: user._id, status: "accepted" }),
-            FollowSchema_1.default.countDocuments({ followerId: user._id, status: "accepted" }),
-        ]);
         (0, logger_1.logEvent)("info", "User logged in", {
             route: "POST /auth/login",
             userId: user._id,
             emailId,
         });
-        res.json({ ...safeUser, followersCount, followingCount, token });
+        res.json({ ...safeUser, token });
     }
     catch (err) {
         (0, logger_1.logApiError)(req, err, { route: "POST /auth/login" });
@@ -197,6 +223,7 @@ authRouter.get("/auth/me", userAuth_1.default, (req, res) => {
 authRouter.post("/auth/logout", userAuth_1.default, async (req, res) => {
     try {
         res.clearCookie("token");
+        await (0, userAuth_1.invalidateUserSession)(String(req.user._id));
         (0, logger_1.logEvent)("info", "User logged out", {
             route: "POST /auth/logout",
             userId: req.user._id,
@@ -225,6 +252,7 @@ authRouter.patch("/auth/update/password", userAuth_1.default, authPasswordUpdate
         user.password = hashPassword;
         await user.save();
         res.clearCookie("token");
+        await (0, userAuth_1.invalidateUserSession)(String(userId));
         (0, logger_1.logEvent)("info", "User password updated", {
             route: "PATCH /auth/update/password",
             userId,

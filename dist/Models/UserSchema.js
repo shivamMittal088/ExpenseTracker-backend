@@ -60,32 +60,10 @@ const UserSchema = new mongoose_1.Schema({
         maxLength: 150,
         //   default : `Hi , I am ${name},`
     },
-    isPublic: {
-        type: Boolean,
-        default: true,
-    },
     hideAmounts: {
         type: Boolean,
         default: false,
     },
-    recentSearches: {
-        type: [
-            {
-                userId: {
-                    type: mongoose_1.Schema.Types.ObjectId,
-                    ref: "User",
-                    required: true,
-                },
-                searchedAt: {
-                    type: Date,
-                    default: Date.now,
-                },
-            },
-        ],
-        default: [],
-    },
 }, { timestamps: true } // adds createdAt & updatedAt 
 );
-// Support name/email lookups for search
-UserSchema.index({ name: "text", emailId: "text" });
 exports.default = mongoose_1.default.model("User", UserSchema);

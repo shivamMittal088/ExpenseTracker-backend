@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -7,8 +40,7 @@ const express_1 = __importDefault(require("express"));
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const UserSchema_1 = __importDefault(require("../Models/UserSchema"));
-const FollowSchema_1 = __importDefault(require("../Models/FollowSchema"));
-const userAuth_1 = __importDefault(require("../Middlewares/userAuth"));
+const userAuth_1 = __importStar(require("../Middlewares/userAuth"));
 const logger_1 = require("../utils/logger");
 const multer_1 = require("../config/multer");
 const cloudinaryClient_1 = require("../config/cloudinaryClient");
@@ -31,20 +63,11 @@ profileRouter.get("/profile/view", userAuth_1.default, async (req, res) => {
         if (!profile) {
             return res.status(404).json({ message: "User not found" });
         }
-        const [followersCount, followingCount] = await Promise.all([
-            FollowSchema_1.default.countDocuments({ followingId: loggedInUserId, status: "accepted" }),
-            FollowSchema_1.default.countDocuments({ followerId: loggedInUserId, status: "accepted" }),
-        ]);
-        const profileWithDefaults = {
-            ...profile,
-            followersCount,
-            followingCount,
-        };
         (0, logger_1.logEvent)("info", "Profile fetched", {
             route: "GET /profile/view",
             userId: loggedInUserId,
         });
-        return res.status(200).json(profileWithDefaults);
+        return res.status(200).json(profile);
     }
     catch (err) {
         (0, logger_1.logApiError)(req, err, { route: "GET /profile/view" });
@@ -82,6 +105,7 @@ profileRouter.patch("/profile/update", userAuth_1.default, async (req, res) => {
         if (!updatedProfile) {
             return res.status(404).json({ message: "User not found" });
         }
+        await (0, userAuth_1.invalidateUserSession)(String(loggedInUserId));
         (0, logger_1.logEvent)("info", "Profile updated", {
             route: "PATCH /profile/update",
             userId: loggedInUserId,
@@ -91,76 +115,6 @@ profileRouter.patch("/profile/update", userAuth_1.default, async (req, res) => {
     }
     catch (err) {
         (0, logger_1.logApiError)(req, err, { route: "PATCH /profile/update" });
-        return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
-    }
-});
-/**
- * PATCH /profile/privacy
- * - Requires userAuth middleware
- * - Updates account privacy (isPublic)
- */
-profileRouter.patch("/profile/privacy", userAuth_1.default, async (req, res) => {
-    try {
-        if (!req.user) {
-            return res.status(401).json({ message: "Not authenticated" });
-        }
-        const loggedInUserId = req.user._id;
-        const { isPublic } = req.body;
-        if (typeof isPublic !== "boolean") {
-            return res.status(400).json({ message: "isPublic must be a boolean" });
-        }
-        const updatedProfile = await UserSchema_1.default.findByIdAndUpdate(loggedInUserId, { $set: { isPublic } }, { new: true, runValidators: true })
-            .select("-password")
-            .lean();
-        if (!updatedProfile) {
-            return res.status(404).json({ message: "User not found" });
-        }
-        (0, logger_1.logEvent)("info", "Privacy updated", {
-            route: "PATCH /profile/privacy",
-            userId: loggedInUserId,
-            isPublic,
-        });
-        return res.status(200).json(updatedProfile);
-    }
-    catch (err) {
-        (0, logger_1.logApiError)(req, err, { route: "PATCH /profile/privacy" });
-        return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
-    }
-});
-/**
- * GET /profile/user/:userId
- * - Requires userAuth
- * - Returns minimal public profile info for a user
- */
-profileRouter.get("/profile/user/:userId", userAuth_1.default, async (req, res) => {
-    try {
-        if (!req.user) {
-            return res.status(401).json({ message: "Not authenticated" });
-        }
-        const { userId } = req.params;
-        const user = await UserSchema_1.default.findById(userId)
-            .select("name emailId photoURL statusMessage createdAt")
-            .lean();
-        if (!user) {
-            return res.status(404).json({ message: "User not found" });
-        }
-        const [followersCount, followingCount] = await Promise.all([
-            FollowSchema_1.default.countDocuments({ followingId: userId, status: "accepted" }),
-            FollowSchema_1.default.countDocuments({ followerId: userId, status: "accepted" }),
-        ]);
-        (0, logger_1.logEvent)("info", "Public profile fetched", {
-            route: "GET /profile/user/:userId",
-            userId: req.user._id,
-            targetUserId: userId,
-        });
-        return res.status(200).json({
-            ...user,
-            followersCount,
-            followingCount,
-        });
-    }
-    catch (err) {
-        (0, logger_1.logApiError)(req, err, { route: "GET /profile/user/:userId" });
         return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
     }
 });
