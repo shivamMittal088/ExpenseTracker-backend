@@ -12,6 +12,7 @@ import expenseExportRouter from "../Routes/expenseExport";
 import expenseMutationsRouter from "../Routes/expenseMutations";
 import seedRouter from "../Routes/seed";
 import tileRouter from "../Routes/tile";
+import pushRouter from "../Routes/push";
 
 dotenv.config();
 
@@ -67,6 +68,7 @@ app.use("/api/", expenseExportRouter);
 app.use("/api/", expenseMutationsRouter);
 app.use("/api/",seedRouter);
 app.use("/api/",tileRouter);
+app.use("/api/",pushRouter);
 
 app.get("/test", (req, res) => {
   res.send("Server alive");
