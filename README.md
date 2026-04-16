@@ -126,6 +126,7 @@ Built for production-style usage with clean route structure, secure auth flows, 
 | 🧭 **Pagination Strategy** | Cursor-based APIs for scalable feeds + offset-style day feed support |
 | 🖼️ **Media Uploads** | Multer validation + Cloudinary storage for profile photos |
 | 🔔 **Push Notifications** | Web Push (VAPID) subscription, test delivery, and service-worker integration |
+| ⏰ **Scheduled Reminders** | Daily reminder at user-selected time (any HH:MM); good morning notification at 4:25 AM IST |
 | ⚡ **Performance-Oriented** | Supports lazy-loading architecture and reduced API churn patterns |
 | 📈 **Observability** | Structured logger + optional Axiom integration |
 
@@ -145,6 +146,7 @@ Built for production-style usage with clean route structure, secure auth flows, 
 | Logging | Axiom (optional) |
 | Rate limiting | Redis |
 | Push Notifications | web-push (VAPID) |
+| Scheduled Jobs | node-cron (local) / Vercel Cron + cron-job.org (production) |
 | Deployment | Vercel |
 
 ---
@@ -183,6 +185,9 @@ CLOUDINARY_API_SECRET=your_api_secret
 VAPID_PUBLIC_KEY=your_vapid_public_key
 VAPID_PRIVATE_KEY=your_vapid_private_key
 VAPID_EMAIL=mailto:you@example.com
+
+# Cron job protection (set same value in Vercel env vars)
+CRON_SECRET=your_random_secret
 ```
 
 ### 3) Run
@@ -295,6 +300,15 @@ All backend routes currently used by the app are listed below.
 | DELETE | `/api/push/unsubscribe` | Required | Remove push subscription by endpoint |
 | POST | `/api/push/test` | Required | Send a test push notification to all user subscriptions |
 
+### Cron Jobs (`/api/cron`)
+
+| Method | Endpoint | Auth | Purpose |
+|---|---|---|---|
+| GET/POST | `/api/cron?job=daily-reminder` | `CRON_SECRET` | Send push notification to users whose saved reminder time matches current UTC minute |
+| GET/POST | `/api/cron?job=good-morning` | `CRON_SECRET` | Send "Good Morning" notification to all subscribers (fires at 22:55 UTC = 4:25 AM IST) |
+
+> **Production setup:** Vercel Hobby plan supports daily cron minimum. For per-minute daily reminders, use [cron-job.org](https://cron-job.org) (free) to call `/api/cron?job=daily-reminder` every minute with `Authorization: Bearer <CRON_SECRET>` header.
+
 ### Utility
 
 | Method | Endpoint | Purpose |
@@ -322,5 +336,5 @@ Contributions are welcome:
 - [ ] Add streak freeze support
 - [ ] Integrate Google Sign-In API
 - [ ] Add email verification code flow
-- [ ] Add cron jobs for scheduled maintenance tasks
-- [ ] Add scheduled push notifications (daily spending reminders)
+- [x] Add cron jobs for scheduled maintenance tasks
+- [x] Add scheduled push notifications (daily spending reminders, good morning at 4:25 AM IST)

@@ -64,6 +64,14 @@ const UserSchema = new mongoose_1.Schema({
         type: Boolean,
         default: false,
     },
+    dailyReminderTime: {
+        type: String,
+        match: /^([01]\d|2[0-3]):[0-5]\d$/, // HH:MM 24-hour format
+    },
+    dailyReminderUTC: {
+        type: String,
+        match: /^([01]\d|2[0-3]):[0-5]\d$/, // HH:MM 24-hour format (UTC)
+    },
 }, { timestamps: true } // adds createdAt & updatedAt 
 );
 exports.default = mongoose_1.default.model("User", UserSchema);

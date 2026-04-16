@@ -85,7 +85,7 @@ profileRouter.patch("/profile/update", userAuth_1.default, async (req, res) => {
             return res.status(401).json({ message: "Not authenticated" });
         }
         const loggedInUserId = req.user._id;
-        const { name, statusMessage, hideAmounts } = req.body;
+        const { name, statusMessage, hideAmounts, dailyReminderTime, tzOffsetMinutes } = req.body;
         // Build update object with only allowed fields
         const updateData = {};
         if (name !== undefined)
@@ -97,6 +97,21 @@ profileRouter.patch("/profile/update", userAuth_1.default, async (req, res) => {
                 return res.status(400).json({ message: "hideAmounts must be a boolean" });
             }
             updateData.hideAmounts = hideAmounts;
+        }
+        if (dailyReminderTime !== undefined) {
+            if (typeof dailyReminderTime !== "string" || !/^([01]\d|2[0-3]):[0-5]\d$/.test(dailyReminderTime)) {
+                return res.status(400).json({ message: "dailyReminderTime must be HH:MM in 24-hour format" });
+            }
+            updateData.dailyReminderTime = dailyReminderTime;
+            // Convert local HH:MM to UTC HH:MM using the client's timezone offset
+            const offset = typeof tzOffsetMinutes === "number" ? tzOffsetMinutes : 0;
+            const [h, m] = dailyReminderTime.split(":").map(Number);
+            const totalLocalMinutes = h * 60 + m;
+            // tzOffsetMinutes from JS is positive when behind UTC, so UTC = local + offset
+            const totalUTCMinutes = ((totalLocalMinutes + offset) % 1440 + 1440) % 1440;
+            const utcH = Math.floor(totalUTCMinutes / 60);
+            const utcM = totalUTCMinutes % 60;
+            updateData.dailyReminderUTC = `${String(utcH).padStart(2, "0")}:${String(utcM).padStart(2, "0")}`;
         }
         if (Object.keys(updateData).length === 0) {
             return res.status(400).json({ message: "No valid fields to update" });
