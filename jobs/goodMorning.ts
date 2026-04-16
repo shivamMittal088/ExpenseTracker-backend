@@ -39,5 +39,6 @@ export async function sendGoodMorningNotification(): Promise<void> {
     }),
   );
 
+  console.log(`[good-morning] Sent: ${sent}, Failed: ${failed}, Total: ${subscriptions.length}`);
   logEvent("info", "Good morning notifications sent", { sent, failed, total: subscriptions.length });
 }

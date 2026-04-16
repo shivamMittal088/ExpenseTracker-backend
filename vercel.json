@@ -5,8 +5,8 @@
     { "src": "api/cron.ts", "use": "@vercel/node" }
   ],
   "crons": [
-    { "path": "/api/cron?job=daily-reminder", "schedule": "* * * * *" },
-    { "path": "/api/cron?job=good-morning", "schedule": "45 3 * * *" }
+    // { "path": "/api/cron?job=daily-reminder", "schedule": "* * * * *" },  // Requires Vercel Pro — use cron-job.org instead
+    { "path": "/api/cron?job=good-morning",   "schedule": "25 4 * * *" }
   ],
   "routes": [
     {
