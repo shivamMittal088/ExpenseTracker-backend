@@ -6,19 +6,30 @@ import { logApiError } from "../utils/logger";
 
 const pushRouter = express.Router();
 
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY!;
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY!;
-const VAPID_EMAIL = process.env.VAPID_EMAIL!;
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
+const VAPID_EMAIL = process.env.VAPID_EMAIL;
 
-webpush.setVapidDetails(VAPID_EMAIL, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+const vapidConfigured = Boolean(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY && VAPID_EMAIL);
+
+if (vapidConfigured) {
+  webpush.setVapidDetails(VAPID_EMAIL!, VAPID_PUBLIC_KEY!, VAPID_PRIVATE_KEY!);
+} else {
+  console.warn("[push] VAPID environment variables are not set — push notification routes will return 503.");
+}
 
 // GET /api/push/vapid-public-key
 // Returns the VAPID public key so the browser can create a push subscription
 pushRouter.get(
-  "/push/vapid-public-key", 
+  "/push/vapid-public-key",
   (_req: Request, res: Response) => {
-  res.json({ publicKey: VAPID_PUBLIC_KEY });
-});
+    if (!vapidConfigured) {
+      res.status(503).json({ message: "Push notifications are not configured on the server." });
+      return;
+    }
+    res.json({ publicKey: VAPID_PUBLIC_KEY });
+  },
+);
 
 // POST /api/push/subscribe
 // Saves the push subscription for the authenticated user
@@ -80,6 +91,10 @@ pushRouter.delete(
 // POST /api/push/test
 // Sends a test push notification to the authenticated user (dev use only)
 pushRouter.post("/push/test", userAuth, async (req: Request, res: Response) => {
+  if (!vapidConfigured) {
+    res.status(503).json({ message: "Push notifications are not configured on the server." });
+    return;
+  }
   try {
     const userId = (req as any).user._id;
     const subscriptions = await PushSubscription.find({ userId });
