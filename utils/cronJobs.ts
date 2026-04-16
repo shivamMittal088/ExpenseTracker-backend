@@ -70,14 +70,58 @@ async function sendDailyReminders(): Promise<void> {
   logEvent("info", "Daily reminders sent", { utcTime, sent, failed, total: subscriptions.length });
 }
 
+async function sendGoodMorningNotification(): Promise<void> {
+  if (!initWebPush()) return;
+
+  // Fetch all push subscriptions (all active users)
+  const subscriptions = await PushSubscription.find().lean();
+  if (subscriptions.length === 0) return;
+
+  const payload = JSON.stringify({
+    title: "Good Morning! 🌅",
+    body: "Start your day right — log your expenses and stay on track!",
+    url: "/",
+  });
+
+  let sent = 0;
+  let failed = 0;
+
+  await Promise.allSettled(
+    subscriptions.map(async (sub) => {
+      try {
+        await webpush.sendNotification(
+          { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } },
+          payload,
+        );
+        sent++;
+      } catch (err) {
+        failed++;
+        logEvent("warn", "Good morning push failed for subscription", {
+          endpoint: sub.endpoint,
+          error: String(err),
+        });
+      }
+    }),
+  );
+
+  logEvent("info", "Good morning notifications sent", { sent, failed, total: subscriptions.length });
+}
+
 export function startCronJobs(): void {
-  // Run every minute — checks if any user's UTC reminder time matches now
+  // Every minute — send daily reminders to users whose UTC reminder time matches now
   cron.schedule("* * * * *", () => {
     sendDailyReminders().catch((err) => {
       logEvent("error", "Daily reminder cron error", { error: String(err) });
     });
   });
 
-  logEvent("info", "Cron jobs started — daily reminders scheduler active");
-  console.log("[cron] Daily reminder scheduler started");
+  // Every day at 03:45 UTC — send good morning to all subscribed users
+  cron.schedule("45 3 * * *", () => {
+    sendGoodMorningNotification().catch((err) => {
+      logEvent("error", "Good morning cron error", { error: String(err) });
+    });
+  }, { timezone: "UTC" });
+
+  logEvent("info", "Cron jobs started — daily reminders + good morning scheduler active");
+  console.log("[cron] Schedulers started: daily reminder (every minute) + good morning (03:45 UTC)");
 }
