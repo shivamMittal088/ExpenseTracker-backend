@@ -3,28 +3,9 @@ import webpush from "web-push";
 import userAuth from "../Middlewares/userAuth";
 import PushSubscription from "../Models/PushSubscriptionSchema";
 import { logApiError } from "../utils/logger";
+import { getVapidConfig, initWebPush } from "../config/webpush";
 
 const pushRouter = express.Router();
-
-/**
- * Read VAPID config lazily at request time so that dotenv load order
- * at module startup never causes false "not configured" results.
- */
-function getVapidConfig(): { publicKey: string; privateKey: string; email: string } | null {
-  const publicKey = process.env.VAPID_PUBLIC_KEY;
-  const privateKey = process.env.VAPID_PRIVATE_KEY;
-  const email = process.env.VAPID_EMAIL;
-  if (!publicKey || !privateKey || !email) return null;
-  return { publicKey, privateKey, email };
-}
-
-/** Initialise web-push with current env vars and return the config, or null. */
-function initWebPush() {
-  const config = getVapidConfig();
-  if (!config) return null;
-  webpush.setVapidDetails(config.email, config.publicKey, config.privateKey);
-  return config;
-}
 
 // GET /api/push/vapid-public-key
 // Returns the VAPID public key so the browser can create a push subscription

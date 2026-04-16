@@ -4,7 +4,7 @@ import app from "./app";
 import { connectDB } from "../config/database";
 import { sendLog } from "../config/axiomClient";
 import { connectRedisClient } from "../config/redisClient";
-import { startCronJobs } from "../utils/cronJobs";
+import { startCronJobs } from "../jobs";
 
 dotenv.config();
 
