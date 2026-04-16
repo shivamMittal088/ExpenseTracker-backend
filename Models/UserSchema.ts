@@ -8,6 +8,7 @@ export interface IUser extends Document {
   photoURL?: string;
   statusMessage?: string;
   hideAmounts: boolean;
+  dailyReminderTime?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -47,6 +48,11 @@ const UserSchema = new Schema<IUser>(
     hideAmounts: {
       type: Boolean,
       default: false,
+    },
+
+    dailyReminderTime: {
+      type: String,
+      match: /^([01]\d|2[0-3]):[0-5]\d$/, // HH:MM 24-hour format
     },
 
   },

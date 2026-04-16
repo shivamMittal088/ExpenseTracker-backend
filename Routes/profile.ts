@@ -72,7 +72,7 @@ profileRouter.patch(
       }
 
       const loggedInUserId = req.user._id;
-      const { name, statusMessage, hideAmounts } = req.body;
+      const { name, statusMessage, hideAmounts, dailyReminderTime } = req.body;
 
       // Build update object with only allowed fields
       const updateData: Record<string, unknown> = {};
@@ -83,6 +83,12 @@ profileRouter.patch(
           return res.status(400).json({ message: "hideAmounts must be a boolean" });
         }
         updateData.hideAmounts = hideAmounts;
+      }
+      if (dailyReminderTime !== undefined) {
+        if (typeof dailyReminderTime !== "string" || !/^([01]\d|2[0-3]):[0-5]\d$/.test(dailyReminderTime)) {
+          return res.status(400).json({ message: "dailyReminderTime must be HH:MM in 24-hour format" });
+        }
+        updateData.dailyReminderTime = dailyReminderTime;
       }
 
       if (Object.keys(updateData).length === 0) {
