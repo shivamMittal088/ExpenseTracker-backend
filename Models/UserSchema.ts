@@ -8,7 +8,8 @@ export interface IUser extends Document {
   photoURL?: string;
   statusMessage?: string;
   hideAmounts: boolean;
-  dailyReminderTime?: string;
+  dailyReminderTime?: string;   // HH:MM local (for display)
+  dailyReminderUTC?: string;    // HH:MM UTC  (for cron matching)
   createdAt: Date;
   updatedAt: Date;
 }
@@ -53,6 +54,11 @@ const UserSchema = new Schema<IUser>(
     dailyReminderTime: {
       type: String,
       match: /^([01]\d|2[0-3]):[0-5]\d$/, // HH:MM 24-hour format
+    },
+
+    dailyReminderUTC: {
+      type: String,
+      match: /^([01]\d|2[0-3]):[0-5]\d$/, // HH:MM 24-hour format (UTC)
     },
 
   },

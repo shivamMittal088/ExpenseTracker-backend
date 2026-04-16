@@ -4,6 +4,7 @@ import app from "./app";
 import { connectDB } from "../config/database";
 import { sendLog } from "../config/axiomClient";
 import { connectRedisClient } from "../config/redisClient";
+import { startCronJobs } from "../utils/cronJobs";
 
 dotenv.config();
 
@@ -40,6 +41,7 @@ connectDB()
     
     server.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
+      startCronJobs();
       void sendLog({
         type: "app_start",
         message: "Backend server started",

@@ -72,7 +72,7 @@ profileRouter.patch(
       }
 
       const loggedInUserId = req.user._id;
-      const { name, statusMessage, hideAmounts, dailyReminderTime } = req.body;
+      const { name, statusMessage, hideAmounts, dailyReminderTime, tzOffsetMinutes } = req.body;
 
       // Build update object with only allowed fields
       const updateData: Record<string, unknown> = {};
@@ -89,6 +89,16 @@ profileRouter.patch(
           return res.status(400).json({ message: "dailyReminderTime must be HH:MM in 24-hour format" });
         }
         updateData.dailyReminderTime = dailyReminderTime;
+
+        // Convert local HH:MM to UTC HH:MM using the client's timezone offset
+        const offset = typeof tzOffsetMinutes === "number" ? tzOffsetMinutes : 0;
+        const [h, m] = dailyReminderTime.split(":").map(Number);
+        const totalLocalMinutes = h * 60 + m;
+        // tzOffsetMinutes from JS is positive when behind UTC, so UTC = local + offset
+        const totalUTCMinutes = ((totalLocalMinutes + offset) % 1440 + 1440) % 1440;
+        const utcH = Math.floor(totalUTCMinutes / 60);
+        const utcM = totalUTCMinutes % 60;
+        updateData.dailyReminderUTC = `${String(utcH).padStart(2, "0")}:${String(utcM).padStart(2, "0")}`;
       }
 
       if (Object.keys(updateData).length === 0) {
