@@ -125,6 +125,7 @@ Built for production-style usage with clean route structure, secure auth flows, 
 | 👥 **User Search** | Search users, view public profiles, recent searches |
 | 🧭 **Pagination Strategy** | Cursor-based APIs for scalable feeds + offset-style day feed support |
 | 🖼️ **Media Uploads** | Multer validation + Cloudinary storage for profile photos |
+| 🔔 **Push Notifications** | Web Push (VAPID) subscription, test delivery, and service-worker integration |
 | ⚡ **Performance-Oriented** | Supports lazy-loading architecture and reduced API churn patterns |
 | 📈 **Observability** | Structured logger + optional Axiom integration |
 
@@ -143,6 +144,7 @@ Built for production-style usage with clean route structure, secure auth flows, 
 | Media Storage | Cloudinary |
 | Logging | Axiom (optional) |
 | Rate limiting | Redis |
+| Push Notifications | web-push (VAPID) |
 | Deployment | Vercel |
 
 ---
@@ -176,6 +178,11 @@ AXIOM_DATASET=expense-tracker
 CLOUDINARY_CLOUD_NAME=your_cloud_name
 CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
+
+# Web Push (VAPID) — generate with: npx web-push generate-vapid-keys
+VAPID_PUBLIC_KEY=your_vapid_public_key
+VAPID_PRIVATE_KEY=your_vapid_private_key
+VAPID_EMAIL=mailto:you@example.com
 ```
 
 ### 3) Run
@@ -279,6 +286,15 @@ All backend routes currently used by the app are listed below.
 | DELETE | `/api/tile/remove/:id` | Remove custom tile |
 | POST | `/api/seed/tiles` | Seed default tiles (if missing) |
 
+### Push Notifications (`/api/push`)
+
+| Method | Endpoint | Auth | Purpose |
+|---|---|---|---|
+| GET | `/api/push/vapid-public-key` | Public | Return VAPID public key for browser subscription |
+| POST | `/api/push/subscribe` | Required | Save push subscription for the authenticated user |
+| DELETE | `/api/push/unsubscribe` | Required | Remove push subscription by endpoint |
+| POST | `/api/push/test` | Required | Send a test push notification to all user subscriptions |
+
 ### Utility
 
 | Method | Endpoint | Purpose |
@@ -302,9 +318,9 @@ Contributions are welcome:
 - [ ] Unit testing coverage for critical APIs
 - [ ] Streaks and badges support
 - [ ] Story-like user activity updates
-- [ ] PWA support
 - [ ] Additional performance monitoring dashboards
 - [ ] Add streak freeze support
 - [ ] Integrate Google Sign-In API
 - [ ] Add email verification code flow
 - [ ] Add cron jobs for scheduled maintenance tasks
+- [ ] Add scheduled push notifications (daily spending reminders)
